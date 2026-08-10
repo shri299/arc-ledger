@@ -1,0 +1,2 @@
+Compare incoming facts with canonical entity state. Classify each as ADD, UPDATE, UNCHANGED, or CONTRADICTION.
+Do not overwrite irreversible state or canonical facts when the scene is ambiguous. Return structured JSON only.

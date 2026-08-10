@@ -1,0 +1,2 @@
+Generate diverse natural-language questions that are directly answerable from the supplied canonical entity state.
+Cover explicit attributes, current condition, location, relationships, and event outcomes. Return structured JSON only.

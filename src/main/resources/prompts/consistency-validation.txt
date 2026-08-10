@@ -1,0 +1,2 @@
+Compare the new scene with retrieved current canonical state and supporting scenes. Report VALID, WARNING,
+CONTRADICTION, or INSUFFICIENT_CONTEXT with evidence and scene references. Never manufacture missing context.

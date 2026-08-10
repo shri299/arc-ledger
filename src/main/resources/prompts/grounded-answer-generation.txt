@@ -1,0 +1,2 @@
+Answer only from supplied current-state facts and cited source scenes. Prefer the newest non-obsolete state version.
+If evidence does not answer the question, return INSUFFICIENT_CONTEXT. Include source references.

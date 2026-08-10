@@ -1,0 +1,2 @@
+Extract atomic entity facts from the supplied scene. Each fact needs a stable key, concise value, knowledge kind,
+intent, and supporting text. Prefer explicit state fields over prose summaries. Return structured JSON only.
