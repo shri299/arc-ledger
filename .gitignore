@@ -1,0 +1,12 @@
+target/
+.m2/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+.env
+*.log
+data/
+*.mv.db
+*.trace.db
+application-local.yml
