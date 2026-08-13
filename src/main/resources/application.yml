@@ -2,13 +2,15 @@ spring:
   application:
     name: arc-ledger
   datasource:
-    url: ${ARCLEDGER_DB_URL:jdbc:h2:mem:arcledger;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
-    username: ${ARCLEDGER_DB_USER:sa}
-    password: ${ARCLEDGER_DB_PASSWORD:}
+    url: ${ARCLEDGER_DB_URL:jdbc:postgresql://localhost:5432/arcledger}
+    username: ${ARCLEDGER_DB_USER:arcledger}
+    password: ${ARCLEDGER_DB_PASSWORD:arcledger}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
+  flyway:
+    enabled: true
   jackson:
     default-property-inclusion: non_null
 arcledger:
@@ -27,6 +29,9 @@ arcledger:
     keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
     request-timeout: ${OLLAMA_REQUEST_TIMEOUT:120s}
   retrieval:
+    vector-store-provider: ${ARCLEDGER_VECTOR_STORE_PROVIDER:pgvector}
+    embedding-dimensions: ${ARCLEDGER_EMBEDDING_DIMENSIONS:768}
+    candidate-limit: ${ARCLEDGER_RETRIEVAL_CANDIDATE_LIMIT:50}
     semantic-weight: 0.65
     entity-weight: 0.15
     version-weight: 0.10

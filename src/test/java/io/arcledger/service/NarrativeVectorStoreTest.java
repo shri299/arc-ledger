@@ -1,6 +1,5 @@
 package io.arcledger.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.arcledger.domain.*;
 import io.arcledger.repository.SyntheticQuestionRepository;
 import io.arcledger.service.impl.*;
@@ -10,10 +9,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class NarrativeVectorStoreTest {
-    private final ObjectMapper mapper = new ObjectMapper();
     private final HashEmbeddingService embeddings = new HashEmbeddingService();
     private final SyntheticQuestionRepository repository = mock(SyntheticQuestionRepository.class);
-    private final JpaNarrativeVectorStore store = new JpaNarrativeVectorStore(repository, embeddings, mapper, .65, .15, .10, .10);
+    private final InMemoryNarrativeVectorStore store = new InMemoryNarrativeVectorStore(repository, embeddings, .65, .15, .10, .10);
 
     @Test void currentVersionOutranksObsoleteVersionAndMetadataFilterApplies() throws Exception {
         Story story = new Story("Test", ""); Chapter chapter = new Chapter(story, 1, "One");
@@ -23,9 +21,11 @@ class NarrativeVectorStoreTest {
         EntityStateVersion v1 = new EntityStateVersion(john, firstScene, john.nextVersion(), "{}", "{}");
         EntityStateVersion v2 = new EntityStateVersion(john, secondScene, john.nextVersion(), "{}", "{}");
         String question = "Where is John currently located?";
-        SyntheticQuestion obsolete = new SyntheticQuestion(v1, question, "John — location: London.", mapper.writeValueAsString(embeddings.embed(question)));
+        SyntheticQuestion obsolete = new SyntheticQuestion(v1, question, "John — location: London.");
         obsolete.markObsolete();
-        SyntheticQuestion current = new SyntheticQuestion(v2, question, "John — location: Paris.", mapper.writeValueAsString(embeddings.embed(question)));
+        SyntheticQuestion current = new SyntheticQuestion(v2, question, "John — location: Paris.");
+        store.index(obsolete, embeddings.embed(question));
+        store.index(current, embeddings.embed(question));
         when(repository.findByStoryId(story.getId())).thenReturn(List.of(obsolete, current));
 
         List<RetrievalHit> hits = store.search(story.getId(), question, john.getId(), 5);

@@ -50,8 +50,8 @@ flowchart LR
     API --> Ingestion["Narrative ingestion pipeline"]
     API --> Query["Retrieval and Q&A pipeline"]
     Ingestion --> LLM["Configured LLM provider"]
-    Ingestion --> Canon["Canonical narrative store"]
-    Ingestion --> Vector["Synthetic-question vector index"]
+    Ingestion --> Canon["PostgreSQL canonical state"]
+    Ingestion --> Vector["pgvector synthetic-question index"]
     Query --> Canon
     Query --> Vector
     Query --> LLM
@@ -70,7 +70,7 @@ The LLM is an interpretation boundary, not the source of truth. ArcLedger accept
 | Continuity | `ConsistencyValidationService` | Detect same-field and cross-field contradictions before state mutation. |
 | Retrieval | `SyntheticQuestionGenerationService`, `EmbeddingService`, `NarrativeVectorStore`, `NarrativeRetrievalService` | Build and search synthetic-query vectors with story, entity, version, scene, and validity metadata. |
 | Answering | `NarrativeQuestionAnsweringService` | Generate an answer only from current retrieved state and return provenance. |
-| Persistence | Spring Data JPA repositories | Persist the story hierarchy, facts, versions, questions, and validation results. |
+| Persistence | PostgreSQL, Spring Data JPA, Flyway | Persist the story hierarchy, facts, versions, questions, and validation results through versioned schema migrations. |
 
 ### Scene ingestion flow
 
@@ -169,16 +169,16 @@ Current questions are eligible for grounded answers; obsolete questions remain a
 
 ### Deployment view
 
-The current implementation is a single Spring Boot service with an embedded H2 database and an in-process vector adapter. These ports are intentionally replaceable: production deployment can move relational state to PostgreSQL, embeddings to a managed model, and vectors to pgvector or another ANN store without changing the domain pipeline.
+The primary deployment is a Spring Boot service backed by PostgreSQL with pgvector. Canonical state and embeddings share one
+ACID database, so version metadata and retrieval filters remain consistent. H2 plus the in-memory vector adapter exists only
+under the test profile; provider ports still allow a different ANN store later without changing the narrative pipeline.
 
 ```mermaid
 flowchart TB
     subgraph Current["Local / evaluation deployment"]
         App["ArcLedger Spring Boot service"]
-        H2["H2 relational store"]
-        LocalVector["In-process vector adapter"]
-        App --> H2
-        App --> LocalVector
+        PGLocal["PostgreSQL + pgvector"]
+        App --> PGLocal
     end
 
     subgraph Production["Recommended production evolution"]
@@ -197,6 +197,8 @@ flowchart TB
 - **Canonical-state isolation:** `INFERENCE` and `UNKNOWN` never become facts automatically.
 - **Synthetic questions over chunk-only indexing:** aligns stored vectors with likely user questions and continuity checks.
 - **Explicit ranking metadata:** prevents obsolete but semantically similar passages from dominating retrieval.
+- **PostgreSQL + pgvector:** stores canonical state and native vectors together with transactional metadata filters.
+- **Flyway-owned schema:** creates the vector extension, relational schema, and indexes reproducibly; Hibernate validates rather than mutates production DDL.
 - **Provider ports:** keeps LLM, embedding, vector, and database choices replaceable.
 - **Synchronous baseline:** keeps local operation simple; the service boundary permits later queue-based ingestion.
 
@@ -220,7 +222,8 @@ flowchart TB
 - Java 17+
 - Spring Boot 3.3
 - Spring Web, Validation, Data JPA
-- H2 for a low-infrastructure local store
+- PostgreSQL 16 with pgvector 0.8.6
+- Flyway-managed schema migrations
 - Ollama for local structured generation and semantic embeddings
 - Pluggable LLM and embedding interfaces
 - JUnit 5, AssertJ, Mockito, MockMvc
@@ -244,11 +247,23 @@ provider-neutral `LanguageModelClient` boundary.
 Canonical persistence, fact superseding, version creation, current/obsolete filtering, and clear `ADD`/`UPDATE`/`UNCHANGED`/
 `CONTRADICTION` decisions remain deterministic.
 
+### Vector storage and retrieval
+
+Synthetic-question embeddings are stored as native `vector(768)` values in PostgreSQL—not JSON blobs. Flyway enables the
+`vector` extension and creates a partial HNSW index using `vector_cosine_ops` for rows where `current_state = TRUE`. Queries
+are filtered by `story_id` and optionally `entity_id`, ordered with pgvector's cosine-distance operator, and only the nearest
+candidates are returned to Java for the explicit entity/version/recency reranking formula.
+
+`embeddinggemma` produces 768-dimensional vectors, matching the migration. If you change to an embedding model with a different
+dimension, create a new Flyway migration for the vector column/index and update `ARCLEDGER_EMBEDDING_DIMENSIONS`; existing vectors
+must then be regenerated.
+
 ## Run locally
 
 ```bash
 git clone <repository-url>
 cd arc-ledger
+docker compose up -d postgres
 ollama serve
 ```
 
@@ -267,8 +282,9 @@ set -a && source .env && set +a
 mvn spring-boot:run
 ```
 
-Ollama listens on `http://localhost:11434` by default and requires no local API key. The application uses an in-memory database
-without `.env`; loading the example switches to persistent H2 under `data/`, which is ignored by Git.
+PostgreSQL listens on `localhost:5432`; the Compose service uses the development credentials from `.env.example` and persists data
+in the named `arcledger-postgres` volume. On application startup, Flyway enables pgvector and creates the full schema and HNSW
+index, then Hibernate validates the mappings. Ollama listens on `http://localhost:11434` and requires no local API key.
 
 To use an Ollama server on another host or choose different models:
 
@@ -360,14 +376,14 @@ mvn test
 mvn clean package
 ```
 
-Coverage focuses on deterministic behavior plus the Ollama HTTP contract: structured non-streaming generation, batch embeddings,
+Coverage focuses on deterministic behavior plus the Ollama HTTP and pgvector adapter contracts: structured non-streaming generation, batch embeddings,
 safe inference fallbacks, add/update/unchanged/contradiction classification, irreversible state, hallucination protection, fact
 superseding, version history, current-state retrieval, metadata filtering, recency/version preference, end-to-end plot-hole
 detection, grounded Q&A, and REST validation. Tests never require a running Ollama instance.
 
 ## Current limitations
 
-- The in-process vector store scans story questions and is intended for local evaluation and moderate corpora.
+- H2 and in-memory vector search are test-only adapters; production startup requires PostgreSQL with the pgvector extension.
 - Ollama inference quality and latency depend on the selected model and local CPU/GPU/RAM.
 - `format: json` guarantees JSON syntax but prompt schemas are still validated by application deserialization rather than Ollama JSON Schema enforcement.
 - Entity alias/coreference resolution currently uses normalized names rather than a learned identity model.
@@ -375,8 +391,8 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 
 ## Roadmap
 
-- PostgreSQL + pgvector adapter with ANN indexing and transactional metadata filters
-- ANN indexing and hybrid lexical/dense retrieval
+- Hybrid PostgreSQL full-text/dense retrieval with reciprocal-rank fusion
+- Production pgvector recall/load benchmarks and HNSW tuning
 - JSON Schema-constrained Ollama outputs with retry/repair policies
 - Alias, pronoun, timeline, and temporal-interval resolution
 - Relationship graph and event causality memory

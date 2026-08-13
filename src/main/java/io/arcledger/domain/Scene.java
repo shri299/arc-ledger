@@ -12,7 +12,7 @@ public class Scene {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "story_id") private Story story;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "chapter_id") private Chapter chapter;
     @Column(name = "sequence_number", nullable = false) private int sequence;
-    @Lob @Column(nullable = false) private String rawText;
+    @Column(nullable = false, columnDefinition = "text") private String rawText;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private ProcessingStatus processingStatus;
     @Column(nullable = false, updatable = false) private Instant createdAt;
     @Column(nullable = false) private Instant updatedAt;

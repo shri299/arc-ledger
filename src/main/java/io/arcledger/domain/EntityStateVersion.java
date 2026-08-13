@@ -13,8 +13,8 @@ public class EntityStateVersion {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "story_id") private Story story;
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "originating_scene_id") private Scene originatingScene;
     @Column(name = "version_number", nullable = false) private int version;
-    @Lob @Column(nullable = false) private String changedFactsJson;
-    @Lob @Column(nullable = false) private String resultingStateJson;
+    @Column(nullable = false, columnDefinition = "text") private String changedFactsJson;
+    @Column(nullable = false, columnDefinition = "text") private String resultingStateJson;
     @Column(nullable = false, updatable = false) private Instant createdAt;
 
     public EntityStateVersion(NarrativeEntity entity, Scene scene, int version, String changedFactsJson, String resultingStateJson) {

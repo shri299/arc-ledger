@@ -1,7 +1,5 @@
 package io.arcledger.service.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.arcledger.domain.*;
 import io.arcledger.repository.SyntheticQuestionRepository;
 import io.arcledger.service.*;
@@ -12,13 +10,13 @@ import java.util.*;
 public class DefaultSyntheticQuestionGenerationService implements SyntheticQuestionGenerationService {
     private final SyntheticQuestionRepository repository;
     private final EmbeddingService embeddings;
+    private final NarrativeVectorStore vectorStore;
     private final NarrativeInferenceService inferenceService;
-    private final ObjectMapper objectMapper;
 
     public DefaultSyntheticQuestionGenerationService(SyntheticQuestionRepository repository, EmbeddingService embeddings,
-        NarrativeInferenceService inferenceService, ObjectMapper objectMapper) {
-        this.repository = repository; this.embeddings = embeddings; this.inferenceService = inferenceService;
-        this.objectMapper = objectMapper;
+        NarrativeVectorStore vectorStore, NarrativeInferenceService inferenceService) {
+        this.repository = repository; this.embeddings = embeddings; this.vectorStore = vectorStore;
+        this.inferenceService = inferenceService;
     }
     @Override
     public void generateAndIndex(EntityStateVersion version, EntityState state) {
@@ -40,12 +38,8 @@ public class DefaultSyntheticQuestionGenerationService implements SyntheticQuest
             Map.Entry<String, String> candidate = entries.get(index);
             EntityState.StateFact fact = state.facts().get(candidate.getValue());
             String answer = name + " — " + humanize(candidate.getValue()) + ": " + fact.value() + ".";
-            try {
-                repository.save(new SyntheticQuestion(version, candidate.getKey(), answer,
-                    objectMapper.writeValueAsString(vectors.get(index))));
-            } catch (JsonProcessingException exception) {
-                throw new IllegalStateException("Could not serialize embedding", exception);
-            }
+            SyntheticQuestion question = repository.saveAndFlush(new SyntheticQuestion(version, candidate.getKey(), answer));
+            vectorStore.index(question, vectors.get(index));
         }
     }
     private List<String> questions(String name, String key, String value) {

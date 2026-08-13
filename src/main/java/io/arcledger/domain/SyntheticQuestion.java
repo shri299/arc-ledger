@@ -15,14 +15,13 @@ public class SyntheticQuestion {
     @ManyToOne(fetch = FetchType.LAZY, optional = false) @JoinColumn(name = "scene_id") private Scene scene;
     @Column(nullable = false, length = 1000) private String question;
     @Column(nullable = false, length = 2000) private String answer;
-    @Lob @Column(nullable = false) private String embeddingJson;
     @Column(name = "current_state", nullable = false) private boolean current;
     @Column(nullable = false, updatable = false) private Instant createdAt;
 
-    public SyntheticQuestion(EntityStateVersion version, String question, String answer, String embeddingJson) {
+    public SyntheticQuestion(EntityStateVersion version, String question, String answer) {
         this.id = UUID.randomUUID(); this.story = version.getStory(); this.entity = version.getEntity();
         this.stateVersion = version; this.scene = version.getOriginatingScene(); this.question = question;
-        this.answer = answer; this.embeddingJson = embeddingJson; this.current = true; this.createdAt = Instant.now();
+        this.answer = answer; this.current = true; this.createdAt = Instant.now();
     }
     public void markObsolete() { this.current = false; }
 }
