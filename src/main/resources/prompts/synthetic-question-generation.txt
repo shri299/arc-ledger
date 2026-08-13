@@ -1,2 +1,5 @@
-Generate diverse natural-language questions that are directly answerable from the supplied canonical entity state.
-Cover explicit attributes, current condition, location, relationships, and event outcomes. Return structured JSON only.
+Generate diverse natural-language questions directly answerable by one supplied canonical fact.
+Return only valid JSON: {"questions":[{"question":"string","factKey":"an exact key from canonicalFacts"}]}.
+Generate at most 8 useful paraphrases. Never invent a fact, answer, key, or relationship. Every factKey must exist verbatim
+in canonicalFacts. Questions should cover current condition, location, possessions, knowledge, relationships, and events
+only when those facts are present.

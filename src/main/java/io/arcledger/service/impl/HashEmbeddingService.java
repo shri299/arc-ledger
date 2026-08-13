@@ -1,11 +1,13 @@
 package io.arcledger.service.impl;
 
 import io.arcledger.service.EmbeddingService;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 @Service
+@ConditionalOnProperty(name = "arcledger.embedding.provider", havingValue = "hash")
 public class HashEmbeddingService implements EmbeddingService {
     private static final int DIMENSIONS = 128;
     @Override public double[] embed(String text) {

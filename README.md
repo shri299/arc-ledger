@@ -208,7 +208,7 @@ flowchart TB
 | Versioned knowledge | Every accepted mutation creates an immutable state snapshot. |
 | Superseding | Replaced facts remain in history and point to their replacement. |
 | Synthetic-query retrieval | Natural questions, rather than raw chunks alone, are embedded. |
-| Dense retrieval | A deterministic local embedding adapter provides a zero-secret baseline. |
+| Dense retrieval | Ollama `embeddinggemma` provides local semantic vectors; a deterministic hash adapter remains available for tests. |
 | Metadata-aware ranking | Story/entity filters, version validity, and scene provenance are retained. |
 | Recency awareness | Current-state and time-decay signals are explicit in scoring. |
 | Hallucination control | Only `FACT` knowledge mutates canon; `INFERENCE` and `UNKNOWN` do not. |
@@ -221,31 +221,67 @@ flowchart TB
 - Spring Boot 3.3
 - Spring Web, Validation, Data JPA
 - H2 for a low-infrastructure local store
+- Ollama for local structured generation and semantic embeddings
 - Pluggable LLM and embedding interfaces
 - JUnit 5, AssertJ, Mockito, MockMvc
 
-No API key is required for the built-in deterministic provider. For real model-backed extraction, the optional OpenAI Responses adapter uses JSON output through the provider-neutral `LanguageModelClient` boundary. See the [official Responses API documentation](https://platform.openai.com/docs/api-reference/responses).
+Ollama is the default provider and keeps narrative text and vectors on the local machine. ArcLedger uses Ollama's non-streaming
+[`/api/generate`](https://docs.ollama.com/api/generate) endpoint for structured JSON and batches text through
+[`/api/embed`](https://docs.ollama.com/api/embed). The optional OpenAI Responses adapter remains available behind the same
+provider-neutral `LanguageModelClient` boundary.
+
+### Where Ollama is used
+
+| Model operation | Trigger | Default model | Safety behavior |
+| --- | --- | --- | --- |
+| Entity, fact, change, and relationship extraction | Every submitted scene | `gemma3:4b` | Output is typed JSON; only explicit `FACT` values can reach reconciliation. |
+| Semantic consistency review | A known entity appears in a new scene | `gemma3:4b` | Results are advisory warnings; deterministic rules alone reject mutations. |
+| Synthetic-question expansion | A valid entity-state version is created | `gemma3:4b` | Model questions must reference an existing canonical fact key. |
+| Synthetic-question embedding | Questions are indexed | `embeddinggemma` | Inputs are sent as one batch per state version. |
+| User-query embedding | `/ask` is called | `embeddinggemma` | Uses the same vector model as indexing. |
+| Grounded answer composition | Relevant current evidence is retrieved | `gemma3:4b` | The model sees only canonical evidence; deterministic text is the fallback. |
+
+Canonical persistence, fact superseding, version creation, current/obsolete filtering, and clear `ADD`/`UPDATE`/`UNCHANGED`/
+`CONTRADICTION` decisions remain deterministic.
 
 ## Run locally
 
 ```bash
 git clone <repository-url>
 cd arc-ledger
+ollama serve
+```
+
+In a second terminal, pull the default local models once:
+
+```bash
+ollama pull gemma3:4b
+ollama pull embeddinggemma
+```
+
+Then start ArcLedger:
+
+```bash
 cp .env.example .env
 set -a && source .env && set +a
 mvn spring-boot:run
 ```
 
-The default in-memory database is useful for quick evaluation. Loading `.env` switches to a persistent H2 file under `data/`, which is ignored by Git.
+Ollama listens on `http://localhost:11434` by default and requires no local API key. The application uses an in-memory database
+without `.env`; loading the example switches to persistent H2 under `data/`, which is ignored by Git.
 
-To enable model-backed extraction:
+To use an Ollama server on another host or choose different models:
 
 ```bash
-export ARCLEDGER_LLM_PROVIDER=openai
-export OPENAI_API_KEY='your-key'
-export ARCLEDGER_LLM_MODEL='gpt-4.1-mini'
+export OLLAMA_BASE_URL='http://localhost:11434'
+export ARCLEDGER_LLM_MODEL='gemma3:4b'
+export ARCLEDGER_EMBEDDING_MODEL='embeddinggemma'
 mvn spring-boot:run
 ```
+
+For a model-free test/demo mode, set `ARCLEDGER_LLM_PROVIDER=rule-based`, `ARCLEDGER_EMBEDDING_PROVIDER=hash`, and
+`ARCLEDGER_INFERENCE_ENABLED=false`. The OpenAI adapter can still be selected with `ARCLEDGER_LLM_PROVIDER=openai` and
+`OPENAI_API_KEY`, while embeddings remain independently configurable.
 
 Prompt templates live in `src/main/resources/prompts/`; long prompts are not scattered through service classes.
 
@@ -324,21 +360,24 @@ mvn test
 mvn clean package
 ```
 
-Coverage focuses on deterministic behavior: add/update/unchanged/contradiction classification, irreversible state, hallucination protection, fact superseding, version history, current-state retrieval, metadata filtering, recency/version preference, end-to-end plot-hole detection, grounded Q&A, and REST validation.
+Coverage focuses on deterministic behavior plus the Ollama HTTP contract: structured non-streaming generation, batch embeddings,
+safe inference fallbacks, add/update/unchanged/contradiction classification, irreversible state, hallucination protection, fact
+superseding, version history, current-state retrieval, metadata filtering, recency/version preference, end-to-end plot-hole
+detection, grounded Q&A, and REST validation. Tests never require a running Ollama instance.
 
 ## Current limitations
 
-- The zero-secret embedding adapter is a compact hashing baseline, not a production semantic model.
 - The in-process vector store scans story questions and is intended for local evaluation and moderate corpora.
-- The rule-based offline extractor recognizes a deliberately small set of narrative constructions; use the OpenAI adapter or add another `LanguageModelClient` for open-domain prose.
+- Ollama inference quality and latency depend on the selected model and local CPU/GPU/RAM.
+- `format: json` guarantees JSON syntax but prompt schemas are still validated by application deserialization rather than Ollama JSON Schema enforcement.
 - Entity alias/coreference resolution currently uses normalized names rather than a learned identity model.
 - Scene processing is synchronous; large manuscripts should move pipeline work to a durable queue.
 
 ## Roadmap
 
 - PostgreSQL + pgvector adapter with ANN indexing and transactional metadata filters
-- Production embedding providers and hybrid lexical/dense retrieval
-- LLM-assisted semantic reconciliation behind deterministic safety rules
+- ANN indexing and hybrid lexical/dense retrieval
+- JSON Schema-constrained Ollama outputs with retry/repair policies
 - Alias, pronoun, timeline, and temporal-interval resolution
 - Relationship graph and event causality memory
 - Async ingestion, retries, idempotency keys, and observability

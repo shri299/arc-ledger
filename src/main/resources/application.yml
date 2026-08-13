@@ -13,10 +13,19 @@ spring:
     default-property-inclusion: non_null
 arcledger:
   llm:
-    provider: ${ARCLEDGER_LLM_PROVIDER:rule-based}
-    model: ${ARCLEDGER_LLM_MODEL:gpt-4.1-mini}
+    provider: ${ARCLEDGER_LLM_PROVIDER:ollama}
+    model: ${ARCLEDGER_LLM_MODEL:gemma3:4b}
     endpoint: ${ARCLEDGER_LLM_ENDPOINT:https://api.openai.com/v1/responses}
     api-key: ${OPENAI_API_KEY:}
+  embedding:
+    provider: ${ARCLEDGER_EMBEDDING_PROVIDER:ollama}
+    model: ${ARCLEDGER_EMBEDDING_MODEL:embeddinggemma}
+  inference:
+    enabled: ${ARCLEDGER_INFERENCE_ENABLED:true}
+  ollama:
+    base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    keep-alive: ${OLLAMA_KEEP_ALIVE:10m}
+    request-timeout: ${OLLAMA_REQUEST_TIMEOUT:120s}
   retrieval:
     semantic-weight: 0.65
     entity-weight: 0.15

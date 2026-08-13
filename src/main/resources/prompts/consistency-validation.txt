@@ -1,2 +1,5 @@
-Compare the new scene with retrieved current canonical state and supporting scenes. Report VALID, WARNING,
-CONTRADICTION, or INSUFFICIENT_CONTEXT with evidence and scene references. Never manufacture missing context.
+Review the new scene against the supplied current canonical facts. Find only semantic, cross-fact, causal, knowledge,
+ability, possession, or location issues that simple same-key comparison could miss. Return only valid JSON:
+{"issues":[{"description":"concise issue","evidence":"known fact plus incoming evidence","factKey":"related incoming key or empty string","insufficientContext":false}]}.
+Return {"issues":[]} when there is no well-supported issue. These are advisory warnings, so be conservative. Never
+manufacture missing context or claim that an old state is current.

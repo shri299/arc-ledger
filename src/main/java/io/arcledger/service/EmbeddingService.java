@@ -1,3 +1,11 @@
 package io.arcledger.service;
 
-public interface EmbeddingService { double[] embed(String text); }
+import java.util.List;
+
+public interface EmbeddingService {
+    double[] embed(String text);
+
+    default List<double[]> embedAll(List<String> texts) {
+        return texts.stream().map(this::embed).toList();
+    }
+}

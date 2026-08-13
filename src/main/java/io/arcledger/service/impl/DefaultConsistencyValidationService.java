@@ -9,7 +9,12 @@ import java.util.*;
 @Service
 public class DefaultConsistencyValidationService implements ConsistencyValidationService {
     private final ConsistencyResultRepository repository;
-    public DefaultConsistencyValidationService(ConsistencyResultRepository repository) { this.repository = repository; }
+    private final NarrativeInferenceService inferenceService;
+    public DefaultConsistencyValidationService(ConsistencyResultRepository repository,
+                                               NarrativeInferenceService inferenceService) {
+        this.repository = repository;
+        this.inferenceService = inferenceService;
+    }
 
     @Override
     public ValidationOutcome validate(Scene scene, NarrativeEntity entity, EntityState state, ExtractedEntity extracted) {
@@ -30,6 +35,18 @@ public class DefaultConsistencyValidationService implements ConsistencyValidatio
                 rejected.add(fact.key());
             }
         }
-        return new ValidationOutcome(Set.copyOf(rejected), !rejected.isEmpty());
+        List<NarrativeInferenceService.ConsistencyAdvisory> advisories =
+            inferenceService.analyzeConsistency(scene, entity.getName(), state, extracted);
+        advisories.forEach(advisory ->
+            repository.save(new ConsistencyResult(scene.getStory(), scene, entity,
+                advisory.insufficientContext() ? ValidationStatus.INSUFFICIENT_CONTEXT : ValidationStatus.WARNING,
+                advisory.insufficientContext() ? Severity.LOW : Severity.MEDIUM,
+                advisory.description(), advisory.evidence(), sourceSceneIds(state))));
+        return new ValidationOutcome(Set.copyOf(rejected), !rejected.isEmpty() || !advisories.isEmpty());
+    }
+
+    private String sourceSceneIds(EntityState state) {
+        return state.facts().values().stream().map(EntityState.StateFact::sourceSceneId)
+            .distinct().map(UUID::toString).reduce((left, right) -> left + "," + right).orElse("");
     }
 }

@@ -1,0 +1,7 @@
+arcledger:
+  llm:
+    provider: rule-based
+  embedding:
+    provider: hash
+  inference:
+    enabled: false
