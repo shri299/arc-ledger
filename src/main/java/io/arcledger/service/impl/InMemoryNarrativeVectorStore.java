@@ -3,6 +3,7 @@ package io.arcledger.service.impl;
 import io.arcledger.domain.SyntheticQuestion;
 import io.arcledger.repository.SyntheticQuestionRepository;
 import io.arcledger.service.*;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,12 @@ public class InMemoryNarrativeVectorStore implements NarrativeVectorStore {
         this.entityWeight = entityWeight;
         this.versionWeight = versionWeight;
         this.recencyWeight = recencyWeight;
+    }
+
+    @PostConstruct
+    public void rebuildIndex() {
+        repository.findAll().forEach(question ->
+            vectors.put(question.getId(), embeddingService.embed(question.getQuestion())));
     }
 
     @Override public void index(SyntheticQuestion question, double[] embedding) {

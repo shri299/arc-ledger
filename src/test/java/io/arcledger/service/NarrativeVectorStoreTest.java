@@ -35,4 +35,21 @@ class NarrativeVectorStoreTest {
         assertThat(hits.get(0).answer()).contains("Paris");
         assertThat(store.search(story.getId(), question, UUID.randomUUID(), 5)).isEmpty();
     }
+
+    @Test void rebuildsPersistedVectorsOnStartup() {
+        Story story = new Story("Test", ""); Chapter chapter = new Chapter(story, 1, "One");
+        Scene scene = new Scene(story, chapter, 1, "John is in London.");
+        NarrativeEntity john = new NarrativeEntity(story, "John", EntityType.CHARACTER);
+        EntityStateVersion version = new EntityStateVersion(john, scene, john.nextVersion(), "{}", "{}");
+        SyntheticQuestion question = new SyntheticQuestion(version, "Where is John?", "John is in London.");
+        when(repository.findAll()).thenReturn(List.of(question));
+        when(repository.findByStoryId(story.getId())).thenReturn(List.of(question));
+
+        store.rebuildIndex();
+
+        assertThat(store.search(story.getId(), "Where is John?", john.getId(), 5))
+            .singleElement()
+            .extracting(RetrievalHit::answer)
+            .isEqualTo("John is in London.");
+    }
 }

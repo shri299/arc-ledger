@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: ${ARCLEDGER_DB_URL:jdbc:h2:file:./data/arcledger;DB_CLOSE_ON_EXIT=FALSE}
+    username: ${ARCLEDGER_DB_USER:sa}
+    password: ${ARCLEDGER_DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  flyway:
+    enabled: false
+arcledger:
+  llm:
+    provider: rule-based
+  embedding:
+    provider: hash
+  inference:
+    enabled: false
+  retrieval:
+    vector-store-provider: in-memory

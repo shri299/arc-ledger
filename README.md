@@ -299,6 +299,15 @@ For a model-free test/demo mode, set `ARCLEDGER_LLM_PROVIDER=rule-based`, `ARCLE
 `ARCLEDGER_INFERENCE_ENABLED=false`. The OpenAI adapter can still be selected with `ARCLEDGER_LLM_PROVIDER=openai` and
 `OPENAI_API_KEY`, while embeddings remain independently configurable.
 
+For a self-contained portfolio deployment where PostgreSQL, pgvector, and Ollama are unavailable, build and run the explicit
+demo profile. It adds H2 only to that artifact, stores relational state on disk, and uses the tested rule-based/hash/in-memory
+adapters without changing the production defaults:
+
+```bash
+mvn -Pdemo package
+java -jar target/arc-ledger-0.1.0-SNAPSHOT.jar --spring.profiles.active=demo
+```
+
 Prompt templates live in `src/main/resources/prompts/`; long prompts are not scattered through service classes.
 
 ## API walkthrough
