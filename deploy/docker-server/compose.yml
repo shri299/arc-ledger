@@ -1,0 +1,120 @@
+name: arcledger
+
+services:
+  ollama:
+    image: ollama/ollama:0.32.14
+    user: "1001:1001"
+    environment:
+      HOME: /tmp
+      OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_MODELS: /models
+      OLLAMA_CONTEXT_LENGTH: "4096"
+      OLLAMA_KEEP_ALIVE: 2m
+      OLLAMA_MAX_LOADED_MODELS: "2"
+      OLLAMA_NUM_PARALLEL: "1"
+    volumes:
+      - ${ARCLEDGER_MODELS_DIR:?Set ARCLEDGER_MODELS_DIR}:/models
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    healthcheck:
+      test: ["CMD-SHELL", "OLLAMA_HOST=http://127.0.0.1:11434 ollama list >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    mem_limit: 4g
+    cpus: 3.5
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  model-loader:
+    image: ollama/ollama:0.32.14
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - ollama pull qwen2.5:1.5b-instruct-q5_0 && ollama pull embeddinggemma
+    depends_on:
+      ollama:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: arcledger-app:local
+    user: "1001:1001"
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      SERVER_PORT: "8080"
+      ARCLEDGER_DB_URL: jdbc:h2:file:/data/arcledger;DB_CLOSE_ON_EXIT=FALSE
+      ARCLEDGER_DB_USER: sa
+      ARCLEDGER_DB_PASSWORD: ""
+      ARCLEDGER_LLM_PROVIDER: ollama
+      ARCLEDGER_LLM_MODEL: qwen2.5:1.5b-instruct-q5_0
+      ARCLEDGER_EMBEDDING_PROVIDER: ollama
+      ARCLEDGER_EMBEDDING_MODEL: embeddinggemma
+      ARCLEDGER_INFERENCE_ENABLED: "true"
+      ARCLEDGER_VECTOR_STORE_PROVIDER: in-memory
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_KEEP_ALIVE: 2m
+      OLLAMA_REQUEST_TIMEOUT: 300s
+    volumes:
+      - ${ARCLEDGER_DATA_DIR:?Set ARCLEDGER_DATA_DIR}:/data
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
+    depends_on:
+      model-loader:
+        condition: service_completed_successfully
+    mem_limit: 1200m
+    cpus: 1.5
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      app:
+        condition: service_healthy
+    mem_limit: 128m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.2
+    command: ["tunnel", "--no-autoupdate", "--url", "http://nginx:8080"]
+    depends_on:
+      nginx:
+        condition: service_healthy
+    mem_limit: 128m
+    cpus: 0.5
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
