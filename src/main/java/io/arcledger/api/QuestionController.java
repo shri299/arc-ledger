@@ -16,7 +16,7 @@ public class QuestionController {
     }
     @GetMapping
     public AskResponse ask(@PathVariable UUID storyId, @RequestParam String query) {
-        storyService.get(storyId);
+        storyService.requireAccess(storyId);
         NarrativeQuestionAnsweringService.Answer answer = service.answer(storyId, query);
         return new AskResponse(answer.answer(), answer.status(), answer.sources());
     }

@@ -16,12 +16,18 @@ public class StoryController {
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
     public StoryResponse create(@Valid @RequestBody CreateStoryRequest request) {
-        Story story = service.create(request.title(), request.description());
+        Story story = service.createForCurrentUser(request.title(), request.description());
         return new StoryResponse(story.getId(), story.getTitle(), story.getDescription(), story.getCreatedAt());
+    }
+    @GetMapping
+    public java.util.List<StoryResponse> list() {
+        return service.listForCurrentUser().stream()
+            .map(story -> new StoryResponse(story.getId(), story.getTitle(), story.getDescription(), story.getCreatedAt()))
+            .toList();
     }
     @PostMapping("/{storyId}/chapters") @ResponseStatus(HttpStatus.CREATED)
     public ChapterResponse addChapter(@PathVariable UUID storyId, @Valid @RequestBody CreateChapterRequest request) {
-        Chapter chapter = service.addChapter(storyId, request.number(), request.title());
+        Chapter chapter = service.addChapterForCurrentUser(storyId, request.number(), request.title());
         return new ChapterResponse(chapter.getId(), storyId, chapter.getNumber(), chapter.getTitle(), chapter.getCreatedAt());
     }
 }

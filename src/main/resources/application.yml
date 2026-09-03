@@ -14,6 +14,10 @@ spring:
   jackson:
     default-property-inclusion: non_null
 arcledger:
+  security:
+    secure-cookies: ${ARCLEDGER_COOKIE_SECURE:true}
+    allowed-origins: ${ARCLEDGER_ALLOWED_ORIGINS:http://localhost:5173}
+    bcrypt-strength: ${ARCLEDGER_BCRYPT_STRENGTH:12}
   llm:
     provider: ${ARCLEDGER_LLM_PROVIDER:ollama}
     model: ${ARCLEDGER_LLM_MODEL:gemma3:4b}
@@ -37,5 +41,13 @@ arcledger:
     version-weight: 0.10
     recency-weight: 0.10
 server:
+  servlet:
+    session:
+      timeout: ${ARCLEDGER_SESSION_TIMEOUT:12h}
+      cookie:
+        name: ARCLEDGER_SESSION
+        http-only: true
+        secure: ${ARCLEDGER_COOKIE_SECURE:true}
+        same-site: lax
   error:
-    include-message: always
+    include-message: never

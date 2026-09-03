@@ -63,6 +63,8 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_KEEP_ALIVE: 2m
       OLLAMA_REQUEST_TIMEOUT: 300s
+      ARCLEDGER_COOKIE_SECURE: "true"
+      ARCLEDGER_ALLOWED_ORIGINS: https://arc.srishtis.dev
     volumes:
       - ${ARCLEDGER_DATA_DIR:?Set ARCLEDGER_DATA_DIR}:/data
     tmpfs:

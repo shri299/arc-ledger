@@ -312,10 +312,25 @@ Prompt templates live in `src/main/resources/prompts/`; long prompts are not sca
 
 ## API walkthrough
 
+All story APIs require a signed-in session and CSRF protection for mutations. The web application handles both automatically. For a command-line walkthrough, first create an account and capture the cookie and CSRF token:
+
+```bash
+curl -sS -c /tmp/arcledger.cookies http://localhost:8080/auth/csrf > /tmp/arcledger-csrf.json
+CSRF_TOKEN=$(jq -r .token /tmp/arcledger-csrf.json)
+curl -sS -b /tmp/arcledger.cookies -c /tmp/arcledger.cookies \
+  -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"displayName":"Example Author","email":"author@example.com","password":"replace-with-a-long-local-password"}' \
+  http://localhost:8080/auth/signup
+curl -sS -b /tmp/arcledger.cookies -c /tmp/arcledger.cookies http://localhost:8080/auth/csrf > /tmp/arcledger-csrf.json
+CSRF_TOKEN=$(jq -r .token /tmp/arcledger-csrf.json)
+```
+
 Create a story:
 
 ```bash
-curl -sS -X POST http://localhost:8080/stories \
+curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories \
+  -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"title":"The Last Meridian","description":"A city at the edge of time"}'
 ```
@@ -323,7 +338,8 @@ curl -sS -X POST http://localhost:8080/stories \
 Create a chapter using the returned story ID:
 
 ```bash
-curl -sS -X POST http://localhost:8080/stories/$STORY_ID/chapters \
+curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters \
+  -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"number":1,"title":"The Siege"}'
 ```
@@ -331,11 +347,13 @@ curl -sS -X POST http://localhost:8080/stories/$STORY_ID/chapters \
 Submit scenes. Processing is automatic:
 
 ```bash
-curl -sS -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
+curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
+  -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"sequence":1,"rawText":"John has black hair. John is in London."}'
 
-curl -sS -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
+curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
+  -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"sequence":2,"rawText":"John loses his left arm during the battle."}'
 ```
@@ -343,25 +361,26 @@ curl -sS -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/sc
 Inspect memory and history:
 
 ```bash
-curl -sS http://localhost:8080/stories/$STORY_ID/entities
-curl -sS http://localhost:8080/stories/$STORY_ID/entities/$ENTITY_ID
-curl -sS http://localhost:8080/stories/$STORY_ID/entities/$ENTITY_ID/history
+curl -sS -b /tmp/arcledger.cookies http://localhost:8080/stories/$STORY_ID/entities
+curl -sS -b /tmp/arcledger.cookies http://localhost:8080/stories/$STORY_ID/entities/$ENTITY_ID
+curl -sS -b /tmp/arcledger.cookies http://localhost:8080/stories/$STORY_ID/entities/$ENTITY_ID/history
 ```
 
 Submit a suspicious scene and inspect its result:
 
 ```bash
-curl -sS -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
+curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
+  -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"sequence":3,"rawText":"John holds one sword in each hand."}'
 
-curl -sS http://localhost:8080/stories/$STORY_ID/scenes/$SCENE_ID/consistency
+curl -sS -b /tmp/arcledger.cookies http://localhost:8080/stories/$STORY_ID/scenes/$SCENE_ID/consistency
 ```
 
 Ask a grounded question:
 
 ```bash
-curl -sS --get http://localhost:8080/stories/$STORY_ID/ask \
+curl -sS -b /tmp/arcledger.cookies --get http://localhost:8080/stories/$STORY_ID/ask \
   --data-urlencode "query=What happened to John's left arm?"
 ```
 
@@ -369,6 +388,12 @@ curl -sS --get http://localhost:8080/stories/$STORY_ID/ask \
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/auth/csrf` | Create or read the session-bound CSRF token. |
+| `POST` | `/auth/signup` | Create an account and authenticated session. |
+| `POST` | `/auth/login` | Authenticate and rotate the session ID. |
+| `POST` | `/auth/logout` | Invalidate the current session. |
+| `GET` | `/auth/me` | Read the current account. |
+| `GET` | `/stories` | List the current account's stories. |
 | `POST` | `/stories` | Create a story. |
 | `POST` | `/stories/{storyId}/chapters` | Add an ordered chapter. |
 | `POST` | `/stories/{storyId}/chapters/{chapterId}/scenes` | Store and process a scene. |
@@ -392,6 +417,8 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 
 ## Current limitations
 
+- Sessions are stored in application memory; use a shared persistent session store before scaling to multiple replicas.
+- Stories created before the ownership migration remain unassigned and are not exposed to any account until explicitly migrated.
 - H2 and in-memory vector search are test-only adapters; production startup requires PostgreSQL with the pgvector extension.
 - Ollama inference quality and latency depend on the selected model and local CPU/GPU/RAM.
 - `format: json` guarantees JSON syntax but prompt schemas are still validated by application deserialization rather than Ollama JSON Schema enforcement.
@@ -400,6 +427,10 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 
 ## Roadmap
 
+- Rate limits for login and high-cost model endpoints, consistent safe error envelopes, request-size limits, and pagination
+- PostgreSQL migration for the Docker server profile, encrypted backups with restore drills, and a shared session store
+- Metrics, structured audit events, traces, health probes, alerts, CI/CD security scans, and tested rollback
+- Email verification, password reset, account recovery, roles, and explicit story sharing
 - Hybrid PostgreSQL full-text/dense retrieval with reciprocal-rank fusion
 - Production pgvector recall/load benchmarks and HNSW tuning
 - JSON Schema-constrained Ollama outputs with retry/repair policies
@@ -407,7 +438,6 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 - Relationship graph and event causality memory
 - Async ingestion, retries, idempotency keys, and observability
 - Evaluation datasets for retrieval freshness and contradiction precision/recall
-- Authentication and multi-tenant story isolation
 
 ## Repository hygiene
 

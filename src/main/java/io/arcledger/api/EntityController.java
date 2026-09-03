@@ -24,13 +24,17 @@ public class EntityController {
     }
     @GetMapping
     public List<EntityResponse> list(@PathVariable UUID storyId) {
-        storyService.get(storyId);
+        storyService.requireAccess(storyId);
         return entityRepository.findByStoryIdOrderByNameAsc(storyId).stream().map(this::response).toList();
     }
     @GetMapping("/{entityId}")
-    public EntityResponse get(@PathVariable UUID storyId, @PathVariable UUID entityId) { return response(find(storyId, entityId)); }
+    public EntityResponse get(@PathVariable UUID storyId, @PathVariable UUID entityId) {
+        storyService.requireAccess(storyId);
+        return response(find(storyId, entityId));
+    }
     @GetMapping("/{entityId}/history")
     public List<StateVersionResponse> history(@PathVariable UUID storyId, @PathVariable UUID entityId) {
+        storyService.requireAccess(storyId);
         NarrativeEntity entity = find(storyId, entityId);
         return versionRepository.findByEntityIdOrderByVersionAsc(entity.getId()).stream().map(version ->
             new StateVersionResponse(version.getId(), version.getVersion(), version.getOriginatingScene().getId(), version.getCreatedAt(),

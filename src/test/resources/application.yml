@@ -9,7 +9,14 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
 arcledger:
+  security:
+    secure-cookies: false
   llm:
     provider: rule-based
   embedding:

@@ -7,6 +7,22 @@ import java.util.*;
 
 public final class ApiModels {
     private ApiModels() {}
+    public record SignupRequest(@NotBlank @Size(max = 100) String displayName,
+                                @NotBlank @Email @Size(max = 320) String email,
+                                @NotBlank @Size(min = 12, max = 128) String password) {
+        public SignupRequest {
+            displayName = displayName == null ? null : displayName.strip();
+            email = email == null ? null : email.strip();
+        }
+    }
+    public record LoginRequest(@NotBlank @Email @Size(max = 320) String email,
+                               @NotBlank @Size(max = 128) String password) {
+        public LoginRequest {
+            email = email == null ? null : email.strip();
+        }
+    }
+    public record UserResponse(UUID id, String email, String displayName) {}
+    public record CsrfResponse(String token) {}
     public record CreateStoryRequest(@NotBlank String title, String description) {}
     public record StoryResponse(UUID id, String title, String description, Instant createdAt) {}
     public record CreateChapterRequest(@Positive int number, @NotBlank String title) {}
