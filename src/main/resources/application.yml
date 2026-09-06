@@ -14,6 +14,21 @@ spring:
   jackson:
     default-property-inclusion: non_null
 arcledger:
+  http:
+    max-request-body-bytes: ${ARCLEDGER_MAX_REQUEST_BODY_BYTES:131072}
+  rate-limit:
+    signup:
+      limit: ${ARCLEDGER_SIGNUP_RATE_LIMIT:5}
+      window-seconds: ${ARCLEDGER_SIGNUP_RATE_WINDOW_SECONDS:3600}
+    login:
+      limit: ${ARCLEDGER_LOGIN_RATE_LIMIT:10}
+      window-seconds: ${ARCLEDGER_LOGIN_RATE_WINDOW_SECONDS:60}
+    scene:
+      limit: ${ARCLEDGER_SCENE_RATE_LIMIT:10}
+      window-seconds: ${ARCLEDGER_SCENE_RATE_WINDOW_SECONDS:300}
+    question:
+      limit: ${ARCLEDGER_QUESTION_RATE_LIMIT:30}
+      window-seconds: ${ARCLEDGER_QUESTION_RATE_WINDOW_SECONDS:60}
   security:
     secure-cookies: ${ARCLEDGER_COOKIE_SECURE:true}
     allowed-origins: ${ARCLEDGER_ALLOWED_ORIGINS:http://localhost:5173}
@@ -41,6 +56,10 @@ arcledger:
     version-weight: 0.10
     recency-weight: 0.10
 server:
+  forward-headers-strategy: framework
+  max-http-request-header-size: 16KB
+  tomcat:
+    max-swallow-size: 128KB
   servlet:
     session:
       timeout: ${ARCLEDGER_SESSION_TIMEOUT:12h}

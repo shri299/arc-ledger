@@ -10,3 +10,5 @@ docker compose up -d --build
 ```
 
 The public host proxy should forward to `127.0.0.1:8080`. The one-shot `model-loader` container exits successfully after verifying that both models are present; that exited state is expected.
+
+The proxy accepts at most 132 KiB so the application can enforce its normalized 128 KiB JSON limit. Phase 2 rate-limit settings are supplied to the app from `compose.yml`; they are process-local and assume this single app container. Scene idempotency records persist in the H2 data bind mount.

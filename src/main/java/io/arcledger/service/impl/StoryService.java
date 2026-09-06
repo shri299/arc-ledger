@@ -3,6 +3,7 @@ package io.arcledger.service.impl;
 import io.arcledger.domain.*;
 import io.arcledger.repository.*;
 import io.arcledger.security.CurrentUserService;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
@@ -19,8 +20,9 @@ public class StoryService {
     @Transactional public Story createForCurrentUser(String title, String description) {
         return storyRepository.save(new Story(title, description, currentUserService.require()));
     }
-    @Transactional(readOnly = true) public List<Story> listForCurrentUser() {
-        return storyRepository.findByOwnerIdOrderByUpdatedAtDesc(currentUserService.require().getId());
+    @Transactional(readOnly = true) public Page<Story> listForCurrentUser(int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        return storyRepository.findByOwnerId(currentUserService.require().getId(), pageable);
     }
     @Transactional(readOnly = true) public Story requireAccess(UUID id) {
         UUID ownerId = currentUserService.require().getId();

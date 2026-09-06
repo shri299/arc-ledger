@@ -17,6 +17,7 @@ server:
 arcledger:
   security:
     secure-cookies: false
+    bcrypt-strength: 4
   llm:
     provider: rule-based
   embedding:

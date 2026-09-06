@@ -14,17 +14,28 @@ The work is split into independently releasable phases. A phase is complete only
 - [x] Frontend auth routes, protected routes, session restoration, and logout
 - [x] Account-scoped browser metadata cache
 - [x] Authentication and ownership integration tests
-- [ ] Assign pre-authentication stories to a chosen account before deployment
-- [ ] Deploy and run an HTTPS end-to-end smoke test
+- [x] Purge the pre-authentication demo stories so no legacy data can be claimed
+- [x] Deploy and run an HTTPS end-to-end smoke test
 
 ## Phase 2 — API hardening
 
-- Rate-limit login, signup, question answering, and scene processing
-- Add consistent, non-sensitive validation errors and correlation IDs
-- Enforce request/body limits, query limits, timeouts, and pagination
-- Add security headers and a reviewed Content Security Policy
-- Add structured security audit events without credentials or story text
-- Define idempotency behavior for expensive write operations
+- [x] Rate-limit login, signup, question answering, and scene processing
+- [x] Add consistent, non-sensitive validation errors and request IDs
+- [x] Enforce request/body limits, query limits, client timeouts, and pagination
+- [x] Add security headers and a reviewed Content Security Policy
+- [x] Add structured security audit events without credentials or story text
+- [x] Define durable idempotency behavior for scene processing
+
+### Phase 2 operating contract
+
+- Collection endpoints return `{ items, page, size, totalItems, totalPages, hasNext }`; page sizes are capped at 100.
+- JSON request bodies are capped at 128 KiB and scene text at 100,000 characters. Questions are capped at 500 characters.
+- Scene writes require an `Idempotency-Key` containing 8–128 safe ASCII characters. Repeating the exact request returns the original scene with `Idempotency-Replayed: true`; reusing the key for different input returns `409`.
+- Every response carries `X-Request-ID`. Error bodies use a safe public message and include the same request ID for support correlation.
+- The current fixed-window limiter is intentionally process-local because production currently runs one application container. It must move to Redis or an edge limiter before replicas are introduced in Phase 3.
+- The backend and frontend must be released together because Phase 2 changes collection response shapes and makes the scene idempotency header mandatory.
+
+Rollback is application-first: restore the previous assembled JAR and Compose/Nginx configuration, then recreate only the app and proxy containers. Migration V3 adds nullable columns and a unique constraint, so those columns can safely remain during an application rollback; do not drop them while rolling back.
 
 ## Phase 3 — durable data and workload reliability
 
@@ -50,6 +61,6 @@ The work is split into independently releasable phases. A phase is complete only
 - Account export and deletion workflows
 - Administrative abuse controls and privacy/audit review
 
-## Deployment gate for Phase 1
+## Legacy-data note
 
-Migration `V2__add_user_ownership.sql` intentionally leaves existing stories unassigned. They are invisible after authentication is enabled, preventing the first public signup from claiming someone else's data. Before deploying Phase 1, choose the account that owns the current server stories and run an explicit, reviewed data migration after that account exists.
+Migration `V2__add_user_ownership.sql` intentionally leaves existing stories unassigned. They are invisible after authentication is enabled, preventing the first public signup from claiming someone else's data. The previous demo data was explicitly purged before the authenticated release.

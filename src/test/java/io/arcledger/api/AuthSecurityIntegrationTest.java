@@ -54,7 +54,7 @@ class AuthSecurityIntegrationTest {
             .andExpect(jsonPath("$.displayName").value("Author"));
         mvc.perform(get("/stories").session(authorSession))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(storyId.toString()));
+            .andExpect(jsonPath("$.items[0].id").value(storyId.toString()));
 
         MockHttpSession strangerSession = signup("stranger@example.com", "Another sufficiently long password", "Stranger");
         mvc.perform(get("/stories/{storyId}/entities", storyId).session(strangerSession))
@@ -72,12 +72,14 @@ class AuthSecurityIntegrationTest {
                 .content("{\"number\":1,\"title\":\"Private chapter\"}"))
             .andExpect(status().isNotFound());
         mvc.perform(post("/stories/{storyId}/chapters/{chapterId}/scenes", storyId, UUID.randomUUID())
-                .session(strangerSession).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .session(strangerSession).with(csrf()).header("Idempotency-Key", "stranger-test-key")
+                .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"sequence\":1,\"rawText\":\"Private scene.\"}"))
             .andExpect(status().isNotFound());
         mvc.perform(get("/stories").session(strangerSession))
             .andExpect(status().isOk())
-            .andExpect(content().json("[]"));
+            .andExpect(jsonPath("$.items").isEmpty())
+            .andExpect(jsonPath("$.totalItems").value(0));
     }
 
     @Test

@@ -5,12 +5,16 @@ import io.arcledger.domain.Scene;
 import io.arcledger.repository.ConsistencyResultRepository;
 import io.arcledger.service.impl.*;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
 
 @RestController
 @RequestMapping("/stories/{storyId}")
+@Validated
 public class SceneController {
     private final SceneService service;
     private final StoryService storyService;
@@ -18,12 +22,21 @@ public class SceneController {
     public SceneController(SceneService service, StoryService storyService, ConsistencyResultRepository consistencyRepository) {
         this.service = service; this.storyService = storyService; this.consistencyRepository = consistencyRepository;
     }
-    @PostMapping("/chapters/{chapterId}/scenes") @ResponseStatus(HttpStatus.CREATED)
-    public SceneResponse create(@PathVariable UUID storyId, @PathVariable UUID chapterId,
+    @PostMapping("/chapters/{chapterId}/scenes")
+    public ResponseEntity<SceneResponse> create(
+                                @PathVariable UUID storyId, @PathVariable UUID chapterId,
+                                @RequestHeader("Idempotency-Key")
+                                @Pattern(regexp = "[A-Za-z0-9._:-]{8,128}") String idempotencyKey,
                                 @Valid @RequestBody CreateSceneRequest request) {
         storyService.requireAccess(storyId);
-        Scene scene = service.create(storyId, chapterId, request.sequence(), request.rawText());
-        return new SceneResponse(scene.getId(), storyId, chapterId, scene.getSequence(), scene.getProcessingStatus(), scene.getCreatedAt());
+        SceneService.IdempotentScene result = service.createIdempotent(
+            storyId, chapterId, request.sequence(), request.rawText(), idempotencyKey);
+        Scene scene = result.scene();
+        SceneResponse body = new SceneResponse(
+            scene.getId(), storyId, chapterId, scene.getSequence(), scene.getProcessingStatus(), scene.getCreatedAt());
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .header("Idempotency-Replayed", Boolean.toString(result.replayed()))
+            .body(body);
     }
     @GetMapping("/scenes/{sceneId}/consistency")
     public List<ConsistencyResponse> consistency(@PathVariable UUID storyId, @PathVariable UUID sceneId) {

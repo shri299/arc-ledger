@@ -349,11 +349,13 @@ Submit scenes. Processing is automatic:
 ```bash
 curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
   -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
+  -H 'Idempotency-Key: scene-example-0001' \
   -H 'Content-Type: application/json' \
   -d '{"sequence":1,"rawText":"John has black hair. John is in London."}'
 
 curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
   -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
+  -H 'Idempotency-Key: scene-example-0002' \
   -H 'Content-Type: application/json' \
   -d '{"sequence":2,"rawText":"John loses his left arm during the battle."}'
 ```
@@ -371,6 +373,7 @@ Submit a suspicious scene and inspect its result:
 ```bash
 curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
   -H "X-CSRF-TOKEN: $CSRF_TOKEN" \
+  -H 'Idempotency-Key: scene-example-0003' \
   -H 'Content-Type: application/json' \
   -d '{"sequence":3,"rawText":"John holds one sword in each hand."}'
 
@@ -393,13 +396,13 @@ curl -sS -b /tmp/arcledger.cookies --get http://localhost:8080/stories/$STORY_ID
 | `POST` | `/auth/login` | Authenticate and rotate the session ID. |
 | `POST` | `/auth/logout` | Invalidate the current session. |
 | `GET` | `/auth/me` | Read the current account. |
-| `GET` | `/stories` | List the current account's stories. |
+| `GET` | `/stories?page=0&size=24` | List the current account's stories with stable pagination metadata. |
 | `POST` | `/stories` | Create a story. |
 | `POST` | `/stories/{storyId}/chapters` | Add an ordered chapter. |
-| `POST` | `/stories/{storyId}/chapters/{chapterId}/scenes` | Store and process a scene. |
-| `GET` | `/stories/{storyId}/entities` | List current entity state. |
+| `POST` | `/stories/{storyId}/chapters/{chapterId}/scenes` | Store and process a scene; requires `Idempotency-Key`. |
+| `GET` | `/stories/{storyId}/entities?page=0&size=50` | List current entity state with pagination. |
 | `GET` | `/stories/{storyId}/entities/{entityId}` | Inspect one entity. |
-| `GET` | `/stories/{storyId}/entities/{entityId}/history` | Inspect every state version. |
+| `GET` | `/stories/{storyId}/entities/{entityId}/history?page=0&size=50` | Inspect state versions with pagination. |
 | `GET` | `/stories/{storyId}/ask?query=...` | Ask against current canon. |
 | `GET` | `/stories/{storyId}/scenes/{sceneId}/consistency` | Read structured continuity results. |
 
@@ -418,6 +421,7 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 ## Current limitations
 
 - Sessions are stored in application memory; use a shared persistent session store before scaling to multiple replicas.
+- API rate-limit counters are application-memory fixed windows; use Redis or Cloudflare edge limits before scaling to multiple replicas.
 - Stories created before the ownership migration remain unassigned and are not exposed to any account until explicitly migrated.
 - H2 and in-memory vector search are test-only adapters; production startup requires PostgreSQL with the pgvector extension.
 - Ollama inference quality and latency depend on the selected model and local CPU/GPU/RAM.
@@ -427,7 +431,6 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 
 ## Roadmap
 
-- Rate limits for login and high-cost model endpoints, consistent safe error envelopes, request-size limits, and pagination
 - PostgreSQL migration for the Docker server profile, encrypted backups with restore drills, and a shared session store
 - Metrics, structured audit events, traces, health probes, alerts, CI/CD security scans, and tested rollback
 - Email verification, password reset, account recovery, roles, and explicit story sharing

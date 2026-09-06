@@ -3,11 +3,14 @@ package io.arcledger.api;
 import io.arcledger.api.ApiModels.AskResponse;
 import io.arcledger.service.NarrativeQuestionAnsweringService;
 import io.arcledger.service.impl.StoryService;
+import jakarta.validation.constraints.*;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/stories/{storyId}/ask")
+@Validated
 public class QuestionController {
     private final StoryService storyService;
     private final NarrativeQuestionAnsweringService service;
@@ -15,7 +18,7 @@ public class QuestionController {
         this.storyService = storyService; this.service = service;
     }
     @GetMapping
-    public AskResponse ask(@PathVariable UUID storyId, @RequestParam String query) {
+    public AskResponse ask(@PathVariable UUID storyId, @RequestParam @NotBlank @Size(max = 500) String query) {
         storyService.requireAccess(storyId);
         NarrativeQuestionAnsweringService.Answer answer = service.answer(storyId, query);
         return new AskResponse(answer.answer(), answer.status(), answer.sources());

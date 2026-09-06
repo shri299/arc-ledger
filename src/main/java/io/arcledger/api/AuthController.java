@@ -23,19 +23,22 @@ public class AuthController {
     private final SecurityContextRepository securityContextRepository;
     private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
     private final CsrfTokenRepository csrfTokenRepository;
+    private final SecurityAuditService audit;
     private final SecurityContextHolderStrategy securityContextHolderStrategy = SecurityContextHolder.getContextHolderStrategy();
 
     public AuthController(UserAccountService accounts, CurrentUserService currentUser,
                           AuthenticationManager authenticationManager,
                           SecurityContextRepository securityContextRepository,
                           SessionAuthenticationStrategy sessionAuthenticationStrategy,
-                          CsrfTokenRepository csrfTokenRepository) {
+                          CsrfTokenRepository csrfTokenRepository,
+                          SecurityAuditService audit) {
         this.accounts = accounts;
         this.currentUser = currentUser;
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
         this.csrfTokenRepository = csrfTokenRepository;
+        this.audit = audit;
     }
 
     @GetMapping("/csrf")
@@ -47,16 +50,29 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse signup(@Valid @RequestBody SignupRequest request,
                                HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        AppUser user = accounts.register(request.email(), request.password(), request.displayName());
-        authenticate(request.email(), request.password(), servletRequest, servletResponse);
-        return response(user);
+        try {
+            AppUser user = accounts.register(request.email(), request.password(), request.displayName());
+            authenticate(request.email(), request.password(), servletRequest, servletResponse);
+            audit.record("SIGNUP", "SUCCEEDED", user.getId(), servletRequest);
+            return response(user);
+        } catch (EmailAlreadyRegisteredException exception) {
+            audit.record("SIGNUP", "REJECTED", null, servletRequest);
+            throw exception;
+        }
     }
 
     @PostMapping("/login")
     public UserResponse login(@Valid @RequestBody LoginRequest request,
                               HttpServletRequest servletRequest, HttpServletResponse servletResponse) {
-        authenticate(request.email(), request.password(), servletRequest, servletResponse);
-        return response(currentUser.require());
+        try {
+            authenticate(request.email(), request.password(), servletRequest, servletResponse);
+            AppUser user = currentUser.require();
+            audit.record("LOGIN", "SUCCEEDED", user.getId(), servletRequest);
+            return response(user);
+        } catch (AuthenticationException exception) {
+            audit.record("LOGIN", "REJECTED", null, servletRequest);
+            throw exception;
+        }
     }
 
     @GetMapping("/me")

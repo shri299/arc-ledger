@@ -4,4 +4,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.*;
 public interface SceneRepository extends JpaRepository<Scene, UUID> {
     Optional<Scene> findByIdAndStoryId(UUID id, UUID storyId);
+    Optional<Scene> findByStoryIdAndIdempotencyKey(UUID storyId, String idempotencyKey);
 }

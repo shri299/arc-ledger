@@ -1,8 +1,6 @@
 package io.arcledger.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.arcledger.api.ApiModels.ErrorResponse;
-import jakarta.servlet.http.HttpServletResponse;
+import io.arcledger.api.ApiErrorWriter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.http.*;
@@ -17,10 +15,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.session.*;
 import org.springframework.security.web.context.*;
 import org.springframework.security.web.csrf.*;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.*;
 
-import java.io.IOException;
-import java.time.Instant;
 import java.util.*;
 
 @Configuration
@@ -56,7 +53,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper,
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ApiErrorWriter errors, SecurityAuditService audit,
                                             SecurityContextRepository securityContextRepository,
                                             CorsConfigurationSource corsConfigurationSource,
                                             CsrfTokenRepository csrfTokenRepository) throws Exception {
@@ -70,23 +67,38 @@ public class SecurityConfig {
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 .sessionFixation(fixation -> fixation.changeSessionId()))
             .requestCache(cache -> cache.disable())
+            .headers(headers -> headers
+                .addHeaderWriter(new StaticHeadersWriter("Content-Security-Policy",
+                    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " +
+                    "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; " +
+                    "form-action 'self'; frame-ancestors 'none'"))
+                .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                    "camera=(), microphone=(), geolocation=(), payment=(), usb=()"))
+                .addHeaderWriter(new StaticHeadersWriter("Referrer-Policy", "no-referrer"))
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-origin")))
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.ico", "/assets/**", "/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())
-            .exceptionHandling(errors -> errors
-                .authenticationEntryPoint((request, response, exception) ->
-                    writeError(objectMapper, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication is required."))
+            .exceptionHandling(exceptions -> exceptions
+                .authenticationEntryPoint((request, response, exception) -> {
+                    audit.record("AUTHENTICATION_REQUIRED", "REJECTED", null, request);
+                    errors.write(request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication is required.");
+                })
                 .accessDeniedHandler((request, response, exception) -> {
                     boolean csrfFailure = exception instanceof CsrfException;
-                    writeError(objectMapper, response, HttpStatus.FORBIDDEN,
+                    audit.record(csrfFailure ? "CSRF_REJECTED" : "ACCESS_DENIED", "REJECTED", null, request);
+                    errors.write(request, response, HttpStatus.FORBIDDEN,
                         csrfFailure ? "INVALID_CSRF_TOKEN" : "FORBIDDEN",
                         csrfFailure ? "Request security token is missing or expired." : "You do not have permission to perform this action.");
                 }))
             .logout(logout -> logout
                 .logoutUrl("/auth/logout")
+                .addLogoutHandler((request, response, authentication) ->
+                    audit.record("LOGOUT", "SUCCEEDED", audit.actorId(authentication), request))
                 .invalidateHttpSession(true)
                 .clearAuthentication(true)
                 .deleteCookies("ARCLEDGER_SESSION", "JSESSIONID")
@@ -102,7 +114,9 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
             .map(String::strip).filter(origin -> !origin.isBlank()).toList());
         configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN", "Idempotency-Key", "X-Request-ID"));
+        configuration.setExposedHeaders(List.of("X-Request-ID", "Retry-After", "RateLimit-Limit",
+            "RateLimit-Remaining", "RateLimit-Reset", "Idempotency-Replayed"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -110,10 +124,4 @@ public class SecurityConfig {
         return source;
     }
 
-    private static void writeError(ObjectMapper objectMapper, HttpServletResponse response, HttpStatus status,
-                                   String code, String message) throws IOException {
-        response.setStatus(status.value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        objectMapper.writeValue(response.getOutputStream(), new ErrorResponse(code, message, Instant.now()));
-    }
 }
