@@ -79,7 +79,7 @@ public class SecurityConfig {
                 .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-origin")))
             .authorizeHttpRequests(authorize -> authorize
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.ico", "/assets/**", "/auth/csrf").permitAll()
+                .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.ico", "/favicon.svg", "/assets/**", "/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())

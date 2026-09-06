@@ -27,6 +27,9 @@ class AuthSecurityIntegrationTest {
 
     @Test
     void protectsApisAndRequiresCsrfForMutations() throws Exception {
+        mvc.perform(get("/favicon.svg"))
+            .andExpect(status().isNotFound());
+
         mvc.perform(get("/stories"))
             .andExpect(status().isUnauthorized())
             .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
