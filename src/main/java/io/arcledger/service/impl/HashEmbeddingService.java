@@ -2,6 +2,7 @@ package io.arcledger.service.impl;
 
 import io.arcledger.service.EmbeddingService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.*;
 import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -9,13 +10,23 @@ import java.util.Locale;
 @Service
 @ConditionalOnProperty(name = "arcledger.embedding.provider", havingValue = "hash")
 public class HashEmbeddingService implements EmbeddingService {
-    private static final int DIMENSIONS = 128;
+    private final int dimensions;
+
+    public HashEmbeddingService() {
+        this(128);
+    }
+
+    @Autowired
+    public HashEmbeddingService(@Value("${arcledger.retrieval.embedding-dimensions:128}") int dimensions) {
+        this.dimensions = Math.max(1, dimensions);
+    }
+
     @Override public double[] embed(String text) {
-        double[] vector = new double[DIMENSIONS];
+        double[] vector = new double[dimensions];
         for (String token : text.toLowerCase(Locale.ROOT).split("[^a-z0-9]+")) {
             if (token.isBlank()) continue;
             int hash = fnv1a(token.getBytes(StandardCharsets.UTF_8));
-            vector[Math.floorMod(hash, DIMENSIONS)] += ((hash & 1) == 0 ? 1.0 : -1.0);
+            vector[Math.floorMod(hash, dimensions)] += ((hash & 1) == 0 ? 1.0 : -1.0);
         }
         double norm = 0.0; for (double value : vector) norm += value * value;
         norm = Math.sqrt(norm); if (norm > 0) for (int i = 0; i < vector.length; i++) vector[i] /= norm;

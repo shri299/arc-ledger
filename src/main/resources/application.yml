@@ -11,6 +11,11 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: never
+      cleanup-cron: "0 */15 * * * *"
   jackson:
     default-property-inclusion: non_null
 arcledger:
@@ -55,6 +60,17 @@ arcledger:
     entity-weight: 0.15
     version-weight: 0.10
     recency-weight: 0.10
+  processing:
+    background-enabled: ${ARCLEDGER_BACKGROUND_PROCESSING:true}
+    poll-delay-ms: ${ARCLEDGER_JOB_POLL_DELAY_MS:1000}
+    batch-size: ${ARCLEDGER_JOB_BATCH_SIZE:1}
+    max-attempts: ${ARCLEDGER_JOB_MAX_ATTEMPTS:3}
+    retry-base-seconds: ${ARCLEDGER_JOB_RETRY_BASE_SECONDS:15}
+    retry-max-seconds: ${ARCLEDGER_JOB_RETRY_MAX_SECONDS:300}
+    lease-seconds: ${ARCLEDGER_JOB_LEASE_SECONDS:420}
+    completed-retention-days: ${ARCLEDGER_JOB_RETENTION_DAYS:30}
+  persistence:
+    distributed-rate-limits: ${ARCLEDGER_DISTRIBUTED_RATE_LIMITS:true}
 server:
   forward-headers-strategy: framework
   max-http-request-header-size: 16KB

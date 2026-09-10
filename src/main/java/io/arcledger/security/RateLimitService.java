@@ -1,6 +1,8 @@
 package io.arcledger.security;
 
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.Map;
@@ -15,10 +17,19 @@ public class RateLimitService {
 
     private final ConcurrentMap<String, Window> windows = new ConcurrentHashMap<>();
     private final AtomicLong checks = new AtomicLong();
+    private final JdbcTemplate jdbcTemplate;
+    private final boolean distributed;
+
+    public RateLimitService(JdbcTemplate jdbcTemplate,
+                            @Value("${arcledger.persistence.distributed-rate-limits:true}") boolean distributed) {
+        this.jdbcTemplate = jdbcTemplate;
+        this.distributed = distributed;
+    }
 
     public Decision check(String key, int limit, long windowSeconds) {
         long now = Instant.now().getEpochSecond();
         long startsAt = now - Math.floorMod(now, windowSeconds);
+        if (distributed) return checkDatabase(key, limit, windowSeconds, now, startsAt);
         AtomicReference<Window> selected = new AtomicReference<>();
         windows.compute(key, (ignored, current) -> {
             Window next = current == null || current.startsAt() != startsAt
@@ -35,7 +46,25 @@ public class RateLimitService {
     }
 
     public void clear() {
-        windows.clear();
+        if (distributed) jdbcTemplate.update("DELETE FROM rate_limit_windows");
+        else windows.clear();
+    }
+
+    private Decision checkDatabase(String key, int limit, long windowSeconds, long now, long startsAt) {
+        Integer count = jdbcTemplate.queryForObject("""
+            INSERT INTO rate_limit_windows(rate_key, window_start, hit_count, expires_at)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT (rate_key, window_start)
+            DO UPDATE SET hit_count = rate_limit_windows.hit_count + 1,
+                          expires_at = EXCLUDED.expires_at
+            RETURNING hit_count
+            """, Integer.class, key, startsAt, startsAt + windowSeconds);
+        if ((checks.incrementAndGet() & 1023) == 0) {
+            jdbcTemplate.update("DELETE FROM rate_limit_windows WHERE expires_at < ?", now);
+        }
+        int hits = count == null ? limit + 1 : count;
+        return new Decision(hits <= limit, limit, Math.max(0, limit - hits),
+            Math.max(1, startsAt + windowSeconds - now));
     }
 
     private void cleanup(long oldestStart) {

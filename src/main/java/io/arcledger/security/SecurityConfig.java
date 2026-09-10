@@ -17,11 +17,24 @@ import org.springframework.security.web.context.*;
 import org.springframework.security.web.csrf.*;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.*;
+import org.springframework.session.web.http.DefaultCookieSerializer;
 
 import java.util.*;
 
 @Configuration
 public class SecurityConfig {
+    @Bean
+    DefaultCookieSerializer sessionCookieSerializer(
+        @Value("${arcledger.security.secure-cookies:true}") boolean secureCookies) {
+        DefaultCookieSerializer serializer = new DefaultCookieSerializer();
+        serializer.setCookieName("ARCLEDGER_SESSION");
+        serializer.setCookiePath("/");
+        serializer.setUseHttpOnlyCookie(true);
+        serializer.setUseSecureCookie(secureCookies);
+        serializer.setSameSite("Lax");
+        return serializer;
+    }
+
     @Bean
     PasswordEncoder passwordEncoder(@Value("${arcledger.security.bcrypt-strength:12}") int strength) {
         return new BCryptPasswordEncoder(strength);

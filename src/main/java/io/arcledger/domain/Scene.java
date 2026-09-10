@@ -30,9 +30,13 @@ public class Scene {
     public Scene(Story story, Chapter chapter, int sequence, String rawText, String idempotencyKey, String requestHash) {
         this.id = UUID.randomUUID(); this.story = story; this.chapter = chapter; this.sequence = sequence;
         this.rawText = rawText; this.idempotencyKey = idempotencyKey; this.requestHash = requestHash;
-        this.processingStatus = ProcessingStatus.PENDING;
+        this.processingStatus = ProcessingStatus.QUEUED;
         this.createdAt = this.updatedAt = Instant.now();
     }
     public void processed() { this.processingStatus = ProcessingStatus.PROCESSED; this.updatedAt = Instant.now(); }
+    public void queued() { this.processingStatus = ProcessingStatus.QUEUED; this.updatedAt = Instant.now(); }
+    public void processing() { this.processingStatus = ProcessingStatus.PROCESSING; this.updatedAt = Instant.now(); }
+    public void retrying() { this.processingStatus = ProcessingStatus.RETRYING; this.updatedAt = Instant.now(); }
+    public void deadLetter() { this.processingStatus = ProcessingStatus.DEAD_LETTER; this.updatedAt = Instant.now(); }
     public void failed() { this.processingStatus = ProcessingStatus.FAILED; this.updatedAt = Instant.now(); }
 }

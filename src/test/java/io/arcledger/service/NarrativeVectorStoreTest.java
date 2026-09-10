@@ -52,4 +52,8 @@ class NarrativeVectorStoreTest {
             .extracting(RetrievalHit::answer)
             .isEqualTo("John is in London.");
     }
+
+    @Test void hashAdapterCanMatchTheProductionVectorDimension() {
+        assertThat(new HashEmbeddingService(768).embed("dimension check")).hasSize(768);
+    }
 }

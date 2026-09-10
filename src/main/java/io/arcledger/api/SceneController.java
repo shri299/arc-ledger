@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
@@ -34,9 +35,23 @@ public class SceneController {
         Scene scene = result.scene();
         SceneResponse body = new SceneResponse(
             scene.getId(), storyId, chapterId, scene.getSequence(), scene.getProcessingStatus(), scene.getCreatedAt());
-        return ResponseEntity.status(HttpStatus.CREATED)
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+            .header(HttpHeaders.RETRY_AFTER, "2")
             .header("Idempotency-Replayed", Boolean.toString(result.replayed()))
             .body(body);
+    }
+    @GetMapping("/scenes/{sceneId}")
+    public SceneResponse get(@PathVariable UUID storyId, @PathVariable UUID sceneId) {
+        storyService.requireAccess(storyId);
+        Scene scene = service.get(storyId, sceneId);
+        return response(storyId, scene);
+    }
+
+    @PostMapping("/scenes/{sceneId}/retry")
+    public ResponseEntity<SceneResponse> retry(@PathVariable UUID storyId, @PathVariable UUID sceneId) {
+        storyService.requireAccess(storyId);
+        Scene scene = service.retry(storyId, sceneId);
+        return ResponseEntity.accepted().header(HttpHeaders.RETRY_AFTER, "2").body(response(storyId, scene));
     }
     @GetMapping("/scenes/{sceneId}/consistency")
     public List<ConsistencyResponse> consistency(@PathVariable UUID storyId, @PathVariable UUID sceneId) {
@@ -50,5 +65,9 @@ public class SceneController {
     private List<UUID> parseIds(String value) {
         if (value == null || value.isBlank()) return List.of();
         return Arrays.stream(value.split(",")).map(String::strip).filter(s -> !s.isBlank()).map(UUID::fromString).toList();
+    }
+    private SceneResponse response(UUID storyId, Scene scene) {
+        return new SceneResponse(scene.getId(), storyId, scene.getChapter().getId(), scene.getSequence(),
+            scene.getProcessingStatus(), scene.getCreatedAt());
     }
 }

@@ -38,4 +38,8 @@ public class StoryService {
     public Story get(UUID id) { return storyRepository.findById(id).orElseThrow(() -> new NoSuchElementException("Story not found: " + id)); }
     public Chapter getChapter(UUID storyId, UUID chapterId) { return chapterRepository.findByIdAndStoryId(chapterId, storyId)
         .orElseThrow(() -> new NoSuchElementException("Chapter not found in story: " + chapterId)); }
+    @Transactional public Chapter lockChapter(UUID storyId, UUID chapterId) {
+        return chapterRepository.findLocked(chapterId, storyId)
+            .orElseThrow(() -> new NoSuchElementException("Chapter not found in story: " + chapterId));
+    }
 }

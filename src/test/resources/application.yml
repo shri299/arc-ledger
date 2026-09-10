@@ -9,6 +9,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
 server:
   servlet:
     session:
@@ -26,3 +30,7 @@ arcledger:
     enabled: false
   retrieval:
     vector-store-provider: in-memory
+  processing:
+    background-enabled: false
+  persistence:
+    distributed-rate-limits: false

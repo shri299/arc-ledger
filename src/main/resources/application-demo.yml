@@ -8,6 +8,10 @@ spring:
       ddl-auto: update
   flyway:
     enabled: false
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
 arcledger:
   llm:
     provider: rule-based
@@ -17,3 +21,7 @@ arcledger:
     enabled: false
   retrieval:
     vector-store-provider: in-memory
+  processing:
+    background-enabled: false
+  persistence:
+    distributed-rate-limits: false

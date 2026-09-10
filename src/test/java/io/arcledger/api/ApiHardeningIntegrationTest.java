@@ -144,7 +144,7 @@ class ApiHardeningIntegrationTest {
         MvcResult first = mvc.perform(post("/stories/{storyId}/chapters/{chapterId}/scenes", storyId, chapterId)
                 .with(user(EMAIL)).with(csrf()).header("Idempotency-Key", key)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isCreated())
+            .andExpect(status().isAccepted())
             .andExpect(header().string("Idempotency-Replayed", "false"))
             .andReturn();
         UUID sceneId = idFrom(first);
@@ -152,7 +152,7 @@ class ApiHardeningIntegrationTest {
         mvc.perform(post("/stories/{storyId}/chapters/{chapterId}/scenes", storyId, chapterId)
                 .with(user(EMAIL)).with(csrf()).header("Idempotency-Key", key)
                 .contentType(MediaType.APPLICATION_JSON).content(body))
-            .andExpect(status().isCreated())
+            .andExpect(status().isAccepted())
             .andExpect(header().string("Idempotency-Replayed", "true"))
             .andExpect(jsonPath("$.id").value(sceneId.toString()));
 

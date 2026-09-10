@@ -1,10 +1,9 @@
 package io.arcledger.domain;
 
-public enum ProcessingStatus {
+public enum ProcessingJobStatus {
     QUEUED,
     PROCESSING,
     RETRYING,
-    PROCESSED,
-    DEAD_LETTER,
-    FAILED
+    COMPLETED,
+    DEAD_LETTER
 }

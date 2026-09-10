@@ -169,9 +169,10 @@ Current questions are eligible for grounded answers; obsolete questions remain a
 
 ### Deployment view
 
-The primary deployment is a Spring Boot service backed by PostgreSQL with pgvector. Canonical state and embeddings share one
-ACID database, so version metadata and retrieval filters remain consistent. H2 plus the in-memory vector adapter exists only
-under the test profile; provider ports still allow a different ANN store later without changing the narrative pipeline.
+The primary deployment is a Spring Boot service backed by PostgreSQL with pgvector. Canonical state, embeddings, sessions,
+rate-limit windows, and durable scene jobs share one ACID database, so authentication, job ownership, version metadata, and
+retrieval filters remain consistent across app restarts and replicas. H2 plus the in-memory vector adapter exists only under
+explicit demo and test profiles.
 
 ```mermaid
 flowchart TB
@@ -344,7 +345,7 @@ curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_
   -d '{"number":1,"title":"The Siege"}'
 ```
 
-Submit scenes. Processing is automatic:
+Submit scenes. The API durably queues each scene and returns `202 Accepted`:
 
 ```bash
 curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_ID/chapters/$CHAPTER_ID/scenes \
@@ -358,6 +359,12 @@ curl -sS -b /tmp/arcledger.cookies -X POST http://localhost:8080/stories/$STORY_
   -H 'Idempotency-Key: scene-example-0002' \
   -H 'Content-Type: application/json' \
   -d '{"sequence":2,"rawText":"John loses his left arm during the battle."}'
+```
+
+Poll the returned scene ID until its status is `PROCESSED` (or `DEAD_LETTER`):
+
+```bash
+curl -sS -b /tmp/arcledger.cookies http://localhost:8080/stories/$STORY_ID/scenes/$SCENE_ID
 ```
 
 Inspect memory and history:
@@ -399,7 +406,9 @@ curl -sS -b /tmp/arcledger.cookies --get http://localhost:8080/stories/$STORY_ID
 | `GET` | `/stories?page=0&size=24` | List the current account's stories with stable pagination metadata. |
 | `POST` | `/stories` | Create a story. |
 | `POST` | `/stories/{storyId}/chapters` | Add an ordered chapter. |
-| `POST` | `/stories/{storyId}/chapters/{chapterId}/scenes` | Store and process a scene; requires `Idempotency-Key`. |
+| `POST` | `/stories/{storyId}/chapters/{chapterId}/scenes` | Atomically store and queue a scene; requires `Idempotency-Key`. |
+| `GET` | `/stories/{storyId}/scenes/{sceneId}` | Read authoritative scene-processing status. |
+| `POST` | `/stories/{storyId}/scenes/{sceneId}/retry` | Requeue a dead-letter scene without duplicating it. |
 | `GET` | `/stories/{storyId}/entities?page=0&size=50` | List current entity state with pagination. |
 | `GET` | `/stories/{storyId}/entities/{entityId}` | Inspect one entity. |
 | `GET` | `/stories/{storyId}/entities/{entityId}/history?page=0&size=50` | Inspect state versions with pagination. |
@@ -420,18 +429,14 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 
 ## Current limitations
 
-- Sessions are stored in application memory; use a shared persistent session store before scaling to multiple replicas.
-- API rate-limit counters are application-memory fixed windows; use Redis or Cloudflare edge limits before scaling to multiple replicas.
 - Stories created before the ownership migration remain unassigned and are not exposed to any account until explicitly migrated.
 - H2 and in-memory vector search are test-only adapters; production startup requires PostgreSQL with the pgvector extension.
 - Ollama inference quality and latency depend on the selected model and local CPU/GPU/RAM.
 - `format: json` guarantees JSON syntax but prompt schemas are still validated by application deserialization rather than Ollama JSON Schema enforcement.
 - Entity alias/coreference resolution currently uses normalized names rather than a learned identity model.
-- Scene processing is synchronous; large manuscripts should move pipeline work to a durable queue.
 
 ## Roadmap
 
-- PostgreSQL migration for the Docker server profile, encrypted backups with restore drills, and a shared session store
 - Metrics, structured audit events, traces, health probes, alerts, CI/CD security scans, and tested rollback
 - Email verification, password reset, account recovery, roles, and explicit story sharing
 - Hybrid PostgreSQL full-text/dense retrieval with reciprocal-rank fusion
@@ -439,7 +444,7 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 - JSON Schema-constrained Ollama outputs with retry/repair policies
 - Alias, pronoun, timeline, and temporal-interval resolution
 - Relationship graph and event causality memory
-- Async ingestion, retries, idempotency keys, and observability
+- Queue-depth and processing-latency metrics with operational alerting
 - Evaluation datasets for retrieval freshness and contradiction precision/recall
 
 ## Repository hygiene
