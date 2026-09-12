@@ -6,6 +6,7 @@ import io.arcledger.repository.ConsistencyResultRepository;
 import io.arcledger.service.impl.*;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
@@ -29,7 +30,7 @@ public class SceneController {
                                 @RequestHeader("Idempotency-Key")
                                 @Pattern(regexp = "[A-Za-z0-9._:-]{8,128}") String idempotencyKey,
                                 @Valid @RequestBody CreateSceneRequest request) {
-        storyService.requireAccess(storyId);
+        storyService.requireEditAccess(storyId);
         SceneService.IdempotentScene result = service.createIdempotent(
             storyId, chapterId, request.sequence(), request.rawText(), idempotencyKey);
         Scene scene = result.scene();
@@ -46,10 +47,16 @@ public class SceneController {
         Scene scene = service.get(storyId, sceneId);
         return response(storyId, scene);
     }
+    @GetMapping("/scenes")
+    public PageResponse<SceneResponse> list(@PathVariable UUID storyId,
+                                             @RequestParam(defaultValue = "0") @Min(0) int page,
+                                             @RequestParam(defaultValue = "100") @Min(1) @Max(100) int size) {
+        return ApiModels.page(service.list(storyId, page, size), scene -> response(storyId, scene));
+    }
 
     @PostMapping("/scenes/{sceneId}/retry")
     public ResponseEntity<SceneResponse> retry(@PathVariable UUID storyId, @PathVariable UUID sceneId) {
-        storyService.requireAccess(storyId);
+        storyService.requireEditAccess(storyId);
         Scene scene = service.retry(storyId, sceneId);
         return ResponseEntity.accepted().header(HttpHeaders.RETRY_AFTER, "2").body(response(storyId, scene));
     }

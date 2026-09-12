@@ -21,7 +21,7 @@ public class AppUserDetailsService implements UserDetailsService {
             .orElseThrow(() -> new UsernameNotFoundException("Invalid email or password."));
         return User.withUsername(user.getEmail())
             .password(user.getPasswordHash())
-            .roles("USER")
+            .roles(user.getAccountRole().name())
             .disabled(!user.isEnabled())
             .build();
     }

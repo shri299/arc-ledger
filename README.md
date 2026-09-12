@@ -403,17 +403,34 @@ curl -sS -b /tmp/arcledger.cookies --get http://localhost:8080/stories/$STORY_ID
 | `POST` | `/auth/login` | Authenticate and rotate the session ID. |
 | `POST` | `/auth/logout` | Invalidate the current session. |
 | `GET` | `/auth/me` | Read the current account. |
+| `POST` | `/auth/verify` | Consume a one-time email-verification token. |
+| `POST` | `/auth/password/forgot` | Request enumeration-safe reset email delivery. |
+| `POST` | `/auth/password/reset` | Consume a one-time password-reset token. |
+| `POST` | `/auth/recovery/reset` | Reset with a previously generated one-time recovery code. |
+| `GET` | `/account/sessions` | Review active account devices. |
+| `POST` | `/account/sessions/{id}/revoke` | Revoke one owned session. |
+| `POST` | `/account/password` | Change the password and revoke all sessions. |
+| `POST` | `/account/recovery-codes` | Replace and display one-time recovery codes. |
+| `GET` | `/account/export` | Download a privacy-filtered JSON account export. |
+| `POST` | `/account/delete` | Password-confirmed account and owned-data deletion. |
 | `GET` | `/stories?page=0&size=24` | List the current account's stories with stable pagination metadata. |
 | `POST` | `/stories` | Create a story. |
 | `POST` | `/stories/{storyId}/chapters` | Add an ordered chapter. |
+| `GET` | `/stories/{storyId}/chapters` | List shared manuscript chapters with pagination. |
 | `POST` | `/stories/{storyId}/chapters/{chapterId}/scenes` | Atomically store and queue a scene; requires `Idempotency-Key`. |
 | `GET` | `/stories/{storyId}/scenes/{sceneId}` | Read authoritative scene-processing status. |
+| `GET` | `/stories/{storyId}/scenes` | List shared story scenes and processing states with pagination. |
 | `POST` | `/stories/{storyId}/scenes/{sceneId}/retry` | Requeue a dead-letter scene without duplicating it. |
 | `GET` | `/stories/{storyId}/entities?page=0&size=50` | List current entity state with pagination. |
 | `GET` | `/stories/{storyId}/entities/{entityId}` | Inspect one entity. |
 | `GET` | `/stories/{storyId}/entities/{entityId}/history?page=0&size=50` | Inspect state versions with pagination. |
 | `GET` | `/stories/{storyId}/ask?query=...` | Ask against current canon. |
 | `GET` | `/stories/{storyId}/scenes/{sceneId}/consistency` | Read structured continuity results. |
+| `GET` | `/stories/{storyId}/collaborators` | Owner-only member and pending-invitation inventory. |
+| `POST` | `/stories/{storyId}/invitations` | Invite a viewer or editor by verified email. |
+| `POST` | `/invitations/accept` | Accept an email-bound story invitation. |
+| `GET` | `/admin/accounts` | Administrator-only account review. |
+| `GET` | `/admin/audit-events` | Administrator-only privacy-safe security events. |
 
 ## Tests
 
@@ -438,7 +455,7 @@ detection, grounded Q&A, and REST validation. Tests never require a running Olla
 ## Roadmap
 
 - Metrics, structured audit events, traces, health probes, alerts, CI/CD security scans, and tested rollback
-- Email verification, password reset, account recovery, roles, and explicit story sharing
+- Production SMTP activation and email-delivery monitoring
 - Hybrid PostgreSQL full-text/dense retrieval with reciprocal-rank fusion
 - Production pgvector recall/load benchmarks and HNSW tuning
 - JSON Schema-constrained Ollama outputs with retry/repair policies

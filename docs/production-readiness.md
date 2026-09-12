@@ -54,7 +54,7 @@ Rollback is application-first: restore the previous assembled JAR and Compose/Ng
 - `GET /stories/{storyId}/scenes/{sceneId}` is the authoritative processing status. An owner can requeue dead-letter work with `POST /stories/{storyId}/scenes/{sceneId}/retry`; tenant ownership remains concealed with `404`.
 - Spring Security sessions and fixed-window rate-limit counters are stored in PostgreSQL. Application restarts no longer sign users out or reset abuse counters, and multiple app replicas share both controls.
 - PostgreSQL is the sole production system of record for relational state and 768-dimension pgvector embeddings. H2 and the in-memory vector store remain explicit development/test adapters only.
-- The backup container produces AES-256 encrypted custom-format dumps with SHA-256 sidecars every 24 hours, retains 14 days, checks Flyway migration version 4, and restores each dump into an isolated verification database.
+- The backup container produces AES-256 encrypted custom-format dumps with SHA-256 sidecars every 24 hours, retains 14 days, checks the expected Flyway migration version, and restores each dump into an isolated verification database.
 
 ### Phase 3 retention and deletion policy
 
@@ -77,10 +77,25 @@ Rollback is application-first: restore the previous assembled JAR and recreate o
 
 ## Phase 5 — account lifecycle and collaboration
 
-- Email verification, password reset, recovery, and session/device management
-- Roles and explicit story-sharing permissions
-- Account export and deletion workflows
-- Administrative abuse controls and privacy/audit review
+- [x] Hashed, expiring email-verification and password-reset tokens with an SMTP delivery boundary
+- [x] One-time offline recovery codes and authenticated password changes
+- [x] Active-device inventory and individual/all-other session revocation
+- [x] Owner, editor, and viewer roles with email-bound, expiring story invitations
+- [x] Portable account export and password-confirmed account deletion
+- [x] Administrator account suspension/restoration and privacy-safe audit review
+- [x] HMAC-pseudonymized IP metadata, 180-day audit retention, and no credentials/story text in audit events
+- [ ] Configure and verify production SMTP delivery, enable verification enforcement, deploy, and complete an HTTPS smoke test
+
+### Phase 5 operating contract
+
+- Raw verification, reset, invitation, recovery, and session identifiers are never stored. Only SHA-256 token hashes or keyed HMAC pseudonyms are persisted, and API responses never expose emailed tokens. Expired tokens, stale invitation records, consumed recovery codes, and orphaned device metadata are pruned automatically.
+- Existing accounts are migration-marked verified to avoid lockout. Once tested SMTP is enabled, new accounts must verify their email before creating, editing, or sharing stories.
+- Viewers can read a shared story; editors can also add chapters and scenes. Only the owner can invite, revoke, or change permissions. Unauthorized story IDs remain concealed with `404`.
+- Password reset, password change, account recovery, suspension, and deletion revoke server-side sessions. Recovery codes are displayed once and individually consumed.
+- Account export excludes password hashes, session/token material, IP pseudonyms, and embedding vectors. Account deletion removes owned narrative data and identity records while de-identifying retained security events; encrypted backups expire after 14 days.
+- Production email and administrator identities belong only in the server `.env`. The repository contains configuration names and safe placeholders, never provider credentials.
+
+Rollback is application-first: restore the previous JAR and recreate only the app container. Migration V5 adds nullable/backfilled identity fields and separate lifecycle, membership, and audit tables; leave them in place during application rollback. Do not delete database state or encrypted backups during rollback.
 
 ## Legacy-data note
 

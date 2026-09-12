@@ -21,10 +21,12 @@ createdb "$verify_database"
 pg_restore --exit-on-error --no-owner --no-acl --dbname="$verify_database" "$raw_dump"
 
 test "$(psql --dbname="$verify_database" --tuples-only --no-align \
-  --command="SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version = '4'")" = "1"
+  --command="SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE AND version = '5'")" = "1"
 test "$(psql --dbname="$verify_database" --tuples-only --no-align \
   --command="SELECT COUNT(*) FROM pg_extension WHERE extname = 'vector'")" = "1"
 test "$(psql --dbname="$verify_database" --tuples-only --no-align \
   --command="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'scene_processing_jobs'")" = "1"
+test "$(psql --dbname="$verify_database" --tuples-only --no-align \
+  --command="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('account_tokens', 'account_recovery_codes', 'account_session_metadata', 'story_memberships', 'story_invitations', 'security_audit_events')")" = "6"
 
 printf '%s\n' "restore verification passed"

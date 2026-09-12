@@ -24,11 +24,40 @@ public final class ApiModels {
             email = email == null ? null : email.strip();
         }
     }
-    public record UserResponse(UUID id, String email, String displayName) {}
+    public record UserResponse(UUID id, String email, String displayName, boolean emailVerified,
+                               boolean emailDeliveryConfigured, AccountRole accountRole) {}
     public record CsrfResponse(String token) {}
+    public record MessageResponse(String message) {}
+    public record TokenRequest(@NotBlank @Size(min = 32, max = 256) String token) {}
+    public record PasswordResetRequest(@NotBlank @Email @Size(max = 320) String email) {}
+    public record NewPasswordRequest(@NotBlank @Size(min = 32, max = 256) String token,
+                                     @NotBlank @Size(min = 12, max = 128) String newPassword) {}
+    public record RecoveryResetRequest(@NotBlank @Email @Size(max = 320) String email,
+                                       @NotBlank @Size(min = 12, max = 64) String recoveryCode,
+                                       @NotBlank @Size(min = 12, max = 128) String newPassword) {}
+    public record ChangePasswordRequest(@NotBlank @Size(max = 128) String currentPassword,
+                                        @NotBlank @Size(min = 12, max = 128) String newPassword) {}
+    public record PasswordConfirmationRequest(@NotBlank @Size(max = 128) String currentPassword) {}
+    public record DeleteAccountRequest(@NotBlank @Size(max = 128) String currentPassword,
+                                       @NotBlank @Pattern(regexp = "DELETE MY ACCOUNT") String confirmation) {}
+    public record RecoveryCodesResponse(List<String> recoveryCodes) {}
+    public record SessionResponse(UUID id, String device, Instant createdAt, Instant lastSeenAt,
+                                  Instant expiresAt, boolean current) {}
+    public record AdminAccountResponse(UUID id, String email, String displayName, boolean emailVerified,
+                                       AccountRole role, boolean enabled, Instant suspendedAt, Instant createdAt) {}
+    public record AuditEventResponse(UUID id, UUID actorId, String eventType, String outcome,
+                                     String targetType, UUID targetId, String requestId, Instant createdAt) {}
     public record CreateStoryRequest(@NotBlank @Size(max = 120) String title,
                                      @Size(max = 2000) String description) {}
-    public record StoryResponse(UUID id, String title, String description, Instant createdAt) {}
+    public record StoryResponse(UUID id, String title, String description, Instant createdAt, StoryRole role) {}
+    public record StoryInvitationRequest(@NotBlank @Email @Size(max = 320) String email,
+                                         @NotNull StoryRole role) {}
+    public record StoryRoleRequest(@NotNull StoryRole role) {}
+    public record StoryMemberResponse(UUID userId, String email, String displayName, StoryRole role, Instant joinedAt) {}
+    public record StoryInvitationResponse(UUID id, String email, StoryRole role, Instant expiresAt, Instant createdAt) {}
+    public record StoryAccessResponse(List<StoryMemberResponse> members,
+                                      List<StoryInvitationResponse> pendingInvitations,
+                                      boolean emailDeliveryConfigured) {}
     public record CreateChapterRequest(@Positive int number, @NotBlank @Size(max = 255) String title) {}
     public record ChapterResponse(UUID id, UUID storyId, int number, String title, Instant createdAt) {}
     public record CreateSceneRequest(@Positive int sequence, @NotBlank @Size(max = 100_000) String rawText) {}

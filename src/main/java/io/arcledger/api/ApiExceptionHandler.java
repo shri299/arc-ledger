@@ -2,6 +2,10 @@ package io.arcledger.api;
 
 import io.arcledger.api.ApiModels.ErrorResponse;
 import io.arcledger.security.EmailAlreadyRegisteredException;
+import io.arcledger.security.InvalidAccountTokenException;
+import io.arcledger.security.PasswordConfirmationException;
+import io.arcledger.security.CollaborationConflictException;
+import io.arcledger.security.EmailVerificationRequiredException;
 import io.arcledger.security.SecurityAuditService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -55,10 +59,27 @@ public class ApiExceptionHandler {
         return response(request, HttpStatus.CONFLICT, "EMAIL_ALREADY_REGISTERED", exception.getMessage());
     }
 
+    @ExceptionHandler(CollaborationConflictException.class)
+    public ResponseEntity<ErrorResponse> collaborationConflict(CollaborationConflictException exception,
+                                                                HttpServletRequest request) {
+        return response(request, HttpStatus.CONFLICT, "COLLABORATION_CONFLICT", exception.getMessage());
+    }
+
     @ExceptionHandler(IdempotencyKeyConflictException.class)
     public ResponseEntity<ErrorResponse> idempotencyConflict(IdempotencyKeyConflictException exception,
                                                               HttpServletRequest request) {
         return response(request, HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_REUSED", exception.getMessage());
+    }
+
+    @ExceptionHandler({InvalidAccountTokenException.class, PasswordConfirmationException.class})
+    public ResponseEntity<ErrorResponse> accountAction(RuntimeException exception, HttpServletRequest request) {
+        return response(request, HttpStatus.BAD_REQUEST, "ACCOUNT_ACTION_REJECTED", exception.getMessage());
+    }
+
+    @ExceptionHandler(EmailVerificationRequiredException.class)
+    public ResponseEntity<ErrorResponse> emailVerificationRequired(EmailVerificationRequiredException exception,
+                                                                    HttpServletRequest request) {
+        return response(request, HttpStatus.FORBIDDEN, "EMAIL_VERIFICATION_REQUIRED", exception.getMessage());
     }
 
     @ExceptionHandler(AuthenticationException.class)

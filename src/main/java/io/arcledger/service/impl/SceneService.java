@@ -6,6 +6,7 @@ import io.arcledger.repository.SceneRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.*;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -60,6 +61,13 @@ public class SceneService {
     public Scene retry(UUID storyId, UUID sceneId) {
         Scene scene = get(storyId, sceneId);
         return coordinator.requeue(scene);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Scene> list(UUID storyId, int page, int size) {
+        storyService.requireAccess(storyId);
+        return repository.findByStoryId(storyId,
+            PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "sequence")));
     }
 
     private void processOrEnqueue(Scene scene) {

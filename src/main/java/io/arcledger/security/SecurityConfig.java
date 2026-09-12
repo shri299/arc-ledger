@@ -7,6 +7,7 @@ import org.springframework.http.*;
 import org.springframework.security.authentication.*;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -22,6 +23,7 @@ import org.springframework.session.web.http.DefaultCookieSerializer;
 import java.util.*;
 
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
     @Bean
     DefaultCookieSerializer sessionCookieSerializer(
@@ -94,6 +96,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/", "/index.html", "/favicon.ico", "/favicon.svg", "/assets/**", "/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/signup", "/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/verify", "/auth/password/forgot",
+                    "/auth/password/reset", "/auth/recovery/reset").permitAll()
                 .requestMatchers("/error").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(exceptions -> exceptions

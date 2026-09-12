@@ -9,10 +9,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-import java.nio.charset.StandardCharsets;
-import java.security.*;
-import java.util.HexFormat;
-
 @Component
 public class RateLimitInterceptor implements HandlerInterceptor {
     private record Policy(String name, int limit, long windowSeconds, boolean accountScoped) {}
@@ -20,12 +16,16 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final RateLimitService limiter;
     private final ApiErrorWriter errors;
     private final SecurityAuditService audit;
+    private final PrivacyHashService privacyHashes;
     private final Policy signup;
     private final Policy login;
     private final Policy scene;
     private final Policy question;
+    private final Policy recovery;
+    private final Policy invitation;
 
     public RateLimitInterceptor(RateLimitService limiter, ApiErrorWriter errors, SecurityAuditService audit,
+        PrivacyHashService privacyHashes,
         @Value("${arcledger.rate-limit.signup.limit:5}") int signupLimit,
         @Value("${arcledger.rate-limit.signup.window-seconds:3600}") long signupWindow,
         @Value("${arcledger.rate-limit.login.limit:10}") int loginLimit,
@@ -33,14 +33,21 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         @Value("${arcledger.rate-limit.scene.limit:10}") int sceneLimit,
         @Value("${arcledger.rate-limit.scene.window-seconds:300}") long sceneWindow,
         @Value("${arcledger.rate-limit.question.limit:30}") int questionLimit,
-        @Value("${arcledger.rate-limit.question.window-seconds:60}") long questionWindow) {
+        @Value("${arcledger.rate-limit.question.window-seconds:60}") long questionWindow,
+        @Value("${arcledger.rate-limit.recovery.limit:5}") int recoveryLimit,
+        @Value("${arcledger.rate-limit.recovery.window-seconds:3600}") long recoveryWindow,
+        @Value("${arcledger.rate-limit.invitation.limit:20}") int invitationLimit,
+        @Value("${arcledger.rate-limit.invitation.window-seconds:3600}") long invitationWindow) {
         this.limiter = limiter;
         this.errors = errors;
         this.audit = audit;
+        this.privacyHashes = privacyHashes;
         this.signup = policy("signup", signupLimit, signupWindow, false);
         this.login = policy("login", loginLimit, loginWindow, false);
         this.scene = policy("scene", sceneLimit, sceneWindow, true);
         this.question = policy("question", questionLimit, questionWindow, true);
+        this.recovery = policy("recovery", recoveryLimit, recoveryWindow, false);
+        this.invitation = policy("invitation", invitationLimit, invitationWindow, true);
     }
 
     @Override
@@ -51,7 +58,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String subject = policy.accountScoped() && authentication != null && authentication.isAuthenticated()
             ? authentication.getName() : request.getRemoteAddr();
-        RateLimitService.Decision decision = limiter.check(policy.name() + ":" + hash(subject),
+        RateLimitService.Decision decision = limiter.check(policy.name() + ":" + privacyHashes.hash(subject),
             policy.limit(), policy.windowSeconds());
         response.setHeader("RateLimit-Limit", Integer.toString(decision.limit()));
         response.setHeader("RateLimit-Remaining", Integer.toString(decision.remaining()));
@@ -73,6 +80,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         if ("POST".equals(method) && "/auth/login".equals(path)) return login;
         if ("POST".equals(method) && path.matches("/stories/[^/]+/chapters/[^/]+/scenes")) return scene;
         if ("GET".equals(method) && path.matches("/stories/[^/]+/ask")) return question;
+        if ("POST".equals(method) && ("/auth/password/forgot".equals(path) ||
+            "/auth/password/reset".equals(path) || "/auth/recovery/reset".equals(path))) return recovery;
+        if ("POST".equals(method) && path.matches("/stories/[^/]+/invitations")) return invitation;
         return null;
     }
 
@@ -83,13 +93,4 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         return new Policy(name, limit, windowSeconds, accountScoped);
     }
 
-    private static String hash(String value) {
-        try {
-            byte[] bytes = MessageDigest.getInstance("SHA-256")
-                .digest((value == null ? "unknown" : value).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(bytes, 0, 16);
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable.", exception);
-        }
-    }
 }

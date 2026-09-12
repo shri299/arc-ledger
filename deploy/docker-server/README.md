@@ -4,6 +4,8 @@ This Compose stack runs ArcLedger, PostgreSQL with pgvector, durable background 
 
 Place the assembled `arcledger.jar` (including the frontend static assets) in this directory, copy `.env.example` to `.env`, set the three persistent host paths, and generate independent random values for the database password and backup passphrase. Never commit `.env`.
 
+Generate a separate random `ARCLEDGER_AUDIT_HASH_KEY` for privacy-preserving IP/session correlation. To activate email verification, password-reset email, and invitations, configure SMTP credentials in `.env`, test delivery, then set both `ARCLEDGER_MAIL_ENABLED=true` and `ARCLEDGER_REQUIRE_EMAIL_VERIFICATION=true`. Keep both flags false until delivery is working so new accounts cannot be stranded. `ARCLEDGER_ADMIN_EMAILS` is a comma-separated allowlist of existing accounts that receive the administrator role at startup.
+
 Before the first startup, create the bind-mount directories with ownership matching UID 1001. Then run:
 
 ```sh
@@ -13,7 +15,7 @@ docker compose up -d --build
 
 The public host proxy should forward to `127.0.0.1:8080`. The one-shot `model-loader` container exits successfully after verifying that both models are present; that exited state is expected. Flyway migration validation must pass before the app becomes healthy.
 
-The proxy accepts at most 132 KiB so the application can enforce its normalized 128 KiB JSON limit. Sessions, rate-limit windows, scene idempotency keys, model-work leases, retries, dead-letter states, canonical data, and vectors all persist in PostgreSQL and remain coordinated if application replicas are added later.
+The proxy accepts at most 132 KiB so the application can enforce its normalized 128 KiB JSON limit. Sessions and device metadata, rate-limit windows, hashed account tokens and recovery codes, story memberships, security audits, scene idempotency keys, model-work leases, retries, dead-letter states, canonical data, and vectors all persist in PostgreSQL and remain coordinated if application replicas are added later.
 
 ## Backups and restore drills
 

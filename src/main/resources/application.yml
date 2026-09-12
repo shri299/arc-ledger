@@ -16,6 +16,17 @@ spring:
     jdbc:
       initialize-schema: never
       cleanup-cron: "0 */15 * * * *"
+  mail:
+    host: ${ARCLEDGER_SMTP_HOST:localhost}
+    port: ${ARCLEDGER_SMTP_PORT:587}
+    username: ${ARCLEDGER_SMTP_USERNAME:}
+    password: ${ARCLEDGER_SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${ARCLEDGER_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${ARCLEDGER_SMTP_STARTTLS:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+      mail.smtp.writetimeout: 10000
   jackson:
     default-property-inclusion: non_null
 arcledger:
@@ -34,10 +45,23 @@ arcledger:
     question:
       limit: ${ARCLEDGER_QUESTION_RATE_LIMIT:30}
       window-seconds: ${ARCLEDGER_QUESTION_RATE_WINDOW_SECONDS:60}
+    recovery:
+      limit: ${ARCLEDGER_RECOVERY_RATE_LIMIT:5}
+      window-seconds: ${ARCLEDGER_RECOVERY_RATE_WINDOW_SECONDS:3600}
+    invitation:
+      limit: ${ARCLEDGER_INVITATION_RATE_LIMIT:20}
+      window-seconds: ${ARCLEDGER_INVITATION_RATE_WINDOW_SECONDS:3600}
   security:
     secure-cookies: ${ARCLEDGER_COOKIE_SECURE:true}
     allowed-origins: ${ARCLEDGER_ALLOWED_ORIGINS:http://localhost:5173}
     bcrypt-strength: ${ARCLEDGER_BCRYPT_STRENGTH:12}
+    audit-hash-key: ${ARCLEDGER_AUDIT_HASH_KEY:development-only-change-me}
+    admin-emails: ${ARCLEDGER_ADMIN_EMAILS:}
+    require-email-verification: ${ARCLEDGER_REQUIRE_EMAIL_VERIFICATION:false}
+  mail:
+    enabled: ${ARCLEDGER_MAIL_ENABLED:false}
+    from: ${ARCLEDGER_MAIL_FROM:noreply@arc.srishtis.dev}
+    public-url: ${ARCLEDGER_PUBLIC_URL:https://arc.srishtis.dev}
   llm:
     provider: ${ARCLEDGER_LLM_PROVIDER:ollama}
     model: ${ARCLEDGER_LLM_MODEL:gemma3:4b}
